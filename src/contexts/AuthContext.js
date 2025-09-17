@@ -20,30 +20,30 @@ export const AuthProvider = ({ children }) => {
   const [syncStats, setSyncStats] = useState({ total: 0, pending: 0, synced: 0, errors: 0 });
 
   useEffect(() => {
-    console.log(' AuthProvider iniciando...');
+    console.log('🔐 AuthProvider iniciando...');
     let timeoutId;
     let mounted = true;
 
     // Timeout para evitar loading infinito
     timeoutId = setTimeout(() => {
       if (mounted) {
-        console.warn(' Timeout de autenticación - forzando fin de loading');
+        console.warn('⏰ Timeout de autenticación - forzando fin de loading');
         setLoading(false);
       }
     }, 30000);
 
     const initializeAuth = async () => {
       try {
-        console.log(' Obteniendo sesión inicial...');
+        console.log('🔐 Obteniendo sesión inicial...');
         
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.error(' Error obteniendo sesión:', sessionError);
+          console.error('❌ Error obteniendo sesión:', sessionError);
           
           // Si hay error de sesión, intentar limpiar datos corruptos
           if (sessionError.message?.includes('invalid') || sessionError.message?.includes('expired')) {
-            console.log(' Intentando limpiar sesión corrupta...');
+            console.log('🧹 Intentando limpiar sesión corrupta...');
             await clearCorruptedSession();
           }
           
@@ -55,14 +55,14 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (mounted) {
-          console.log(' Sesión obtenida:', session ? 'Usuario logueado' : 'Sin usuario');
+          console.log('📋 Sesión obtenida:', session ? 'Usuario logueado' : 'Sin usuario');
           setUser(session?.user ?? null);
           
           if (session?.user) {
             // Validar integridad de la sesión
             const isValidSession = await validateSessionIntegrity(session.user);
             if (!isValidSession) {
-              console.warn(' Sesión inválida detectada, limpiando...');
+              console.warn('⚠️ Sesión inválida detectada, limpiando...');
               await clearCorruptedSession();
               if (mounted) {
                 setUser(null);
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }) => {
             await fetchProfile(session.user.id);
             // Ejecutar sincronización en paralelo sin bloquear
             performAutoSync(session.user.id).catch(error => {
-              console.warn(' Sincronización falló pero no bloquea la carga:', error);
+              console.warn('⚠️ Sincronización falló pero no bloquea la carga:', error);
             });
           } else {
             setLoading(false);
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
         }
         
       } catch (error) {
-        console.error(' Error inicializando auth:', error);
+        console.error('❌ Error inicializando auth:', error);
         if (mounted) {
           setError('Error de conexión. Verifica tu internet e intenta de nuevo.');
           setLoading(false);
@@ -95,19 +95,20 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
+    // Inicializar autenticación
     initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(' Cambio de estado auth:', event);
+        console.log('🔄 Cambio de estado auth:', event);
         
         if (!mounted) return;
         
         setError(null); // Limpiar errores previos
         
         if (event === 'SIGNED_OUT') {
-          console.log(' Usuario cerró sesión - limpiando estado');
+          console.log('🚪 Usuario cerró sesión - limpiando estado');
           setUser(null);
           setProfile(null);
           setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
@@ -116,15 +117,15 @@ export const AuthProvider = ({ children }) => {
         }
         
         if (session?.user) {
-          console.log(' Usuario autenticado:', session.user.email);
+          console.log('👤 Usuario autenticado:', session.user.email);
           setUser(session.user);
           await fetchProfile(session.user.id);
           // Ejecutar sincronización en paralelo sin bloquear
           performAutoSync(session.user.id).catch(error => {
-            console.warn(' Sincronización falló en auth change:', error);
+            console.warn('⚠️ Sincronización falló en auth change:', error);
           });
         } else {
-          console.log(' Sin sesión de usuario');
+          console.log('❌ Sin sesión de usuario');
           setUser(null);
           setProfile(null);
           setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
@@ -144,7 +145,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (userId) => {
     try {
-      console.log(' Obteniendo perfil para:', userId);
+      console.log('📝 Obteniendo perfil para:', userId);
       
       // Agregar timeout para evitar colgarse
       const timeoutPromise = new Promise((_, reject) => {
@@ -157,27 +158,27 @@ export const AuthProvider = ({ children }) => {
         .eq('id', userId)
         .single();
       
-      console.log(' Ejecutando consulta de perfil...');
+      console.log('🔄 Ejecutando consulta de perfil...');
       const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
-      console.log(' Resultado de consulta:', { hasData: !!data, error: error?.message, errorCode: error?.code });
+      console.log('📊 Resultado de consulta:', { hasData: !!data, error: error?.message, errorCode: error?.code });
 
       if (error) {
-        console.error(' Error obteniendo perfil:', error);
+        console.error('❌ Error obteniendo perfil:', error);
         
         // Si el perfil no existe, crear uno por defecto
         if (error.code === 'PGRST116') {
-          console.log(' Creando perfil por defecto...');
+          console.log('📝 Creando perfil por defecto...');
           
           // Obtener información del usuario autenticado
-          console.log(' Obteniendo datos del usuario actual...');
+          console.log('👤 Obteniendo datos del usuario actual...');
           const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
           
           if (userError) {
-            console.error(' Error obteniendo usuario actual:', userError);
+            console.error('❌ Error obteniendo usuario actual:', userError);
             throw userError;
           }
           
-          console.log(' Usuario actual:', { 
+          console.log('👤 Usuario actual:', { 
             id: currentUser?.id, 
             email: currentUser?.email, 
             hasMetadata: !!currentUser?.user_metadata 
@@ -188,7 +189,7 @@ export const AuthProvider = ({ children }) => {
                           currentUser?.email?.split('@')[0] || 
                           'Usuario';
           
-          console.log(' Creando perfil con datos:', { userName, userEmail, userId });
+          console.log('📝 Creando perfil con datos:', { userName, userEmail, userId });
           
           const createProfilePromise = supabase
             .from('profiles')
@@ -210,30 +211,30 @@ export const AuthProvider = ({ children }) => {
           ]);
 
           if (createError) {
-            console.error(' Error creando perfil:', createError);
+            console.error('❌ Error creando perfil:', createError);
             setError('Error creando perfil de usuario');
           } else {
-            console.log(' Perfil creado exitosamente:', newProfile);
+            console.log('📝 Perfil creado exitosamente:', newProfile);
             setProfile(newProfile);
           }
         } else {
-          console.error(' Error de base de datos:', error);
+          console.error('❌ Error de base de datos:', error);
           setError('Error obteniendo perfil de usuario');
         }
       } else {
-        console.log(' Perfil obtenido:', data?.role, data?.full_name);
+        console.log('📊 Perfil obtenido:', data?.role, data?.full_name);
         setProfile(data);
       }
     } catch (error) {
-      console.error(' Error inesperado obteniendo perfil:', error);
+      console.error('❌ Error inesperado obteniendo perfil:', error);
       if (error.message === 'Timeout obteniendo perfil' || error.message === 'Timeout creando perfil') {
-        console.error(' Timeout detectado - posible problema de conectividad');
+        console.error('⏰ Timeout detectado - posible problema de conectividad');
         setError('Timeout de conexión. Verifica tu internet.');
       } else {
         setError('Error inesperado obteniendo perfil');
       }
     } finally {
-      console.log(' Finalizando fetchProfile, setting loading to false');
+      console.log('🔄 Finalizando fetchProfile, setting loading to false');
       setLoading(false);
     }
   };
@@ -244,7 +245,7 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      console.log(' Reintentando inicialización...');
+      console.log('🔄 Reintentando inicialización...');
       await clearCorruptedSession();
       
       // Forzar nueva sesión
@@ -263,7 +264,7 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       }
     } catch (error) {
-      console.error(' Error en reintento:', error);
+      console.error('❌ Error en reintento:', error);
       setError('Error al reintentar. Intenta refrescar la página.');
       setLoading(false);
     }
@@ -272,7 +273,7 @@ export const AuthProvider = ({ children }) => {
   // Sincronización automática
   const performAutoSync = async (userId) => {
     try {
-      console.log(' Iniciando sincronización automática...');
+      console.log('🔄 Iniciando sincronización automática...');
       
       // Agregar timeout para sincronización
       const syncTimeout = new Promise((_, reject) => {
@@ -282,11 +283,11 @@ export const AuthProvider = ({ children }) => {
       const syncProcess = async () => {
         // Obtener estadísticas antes de sincronizar
         const statsBefore = await TreeStorageService.getSyncStats();
-        console.log(' Stats antes de sync:', statsBefore);
+        console.log('📊 Stats antes de sync:', statsBefore);
         setSyncStats(statsBefore);
         
         if (statsBefore.pending > 0) {
-          console.log(` Sincronizando ${statsBefore.pending} árboles pendientes...`);
+          console.log(`🔄 Sincronizando ${statsBefore.pending} árboles pendientes...`);
           // Sincronizar árboles pendientes
           const syncResult = await TreeStorageService.syncAllPendingTrees(userId);
           
@@ -294,18 +295,18 @@ export const AuthProvider = ({ children }) => {
           const statsAfter = await TreeStorageService.getSyncStats();
           setSyncStats(statsAfter);
           
-          console.log(` Sincronización completada: ${syncResult.successful}/${syncResult.total} árboles sincronizados`);
+          console.log(`🔄 Sincronización completada: ${syncResult.successful}/${syncResult.total} árboles sincronizados`);
         } else {
-          console.log(' No hay árboles pendientes para sincronizar');
+          console.log('📊 No hay árboles pendientes para sincronizar');
         }
       };
       
       await Promise.race([syncProcess(), syncTimeout]);
       
     } catch (error) {
-      console.error(' Error en sincronización automática:', error);
+      console.error('❌ Error en sincronización automática:', error);
       if (error.message === 'Timeout en sincronización') {
-        console.warn(' Timeout en sincronización - continuando sin bloquear');
+        console.warn('⏰ Timeout en sincronización - continuando sin bloquear');
       }
       // No bloquear el proceso principal si falla la sincronización
     }
@@ -317,7 +318,7 @@ export const AuthProvider = ({ children }) => {
     try {
       return await TreeStorageService.getAllTrees(user.id);
     } catch (error) {
-      console.error(' Error obteniendo árboles:', error);
+      console.error('❌ Error obteniendo árboles:', error);
       return [];
     }
   };
@@ -329,7 +330,7 @@ export const AuthProvider = ({ children }) => {
       await performAutoSync(user.id);
       return true;
     } catch (error) {
-      console.error(' Error en sincronización manual:', error);
+      console.error('❌ Error en sincronización manual:', error);
       return false;
     }
   };
@@ -420,10 +421,10 @@ export const AuthProvider = ({ children }) => {
   const refreshProfile = async () => {
     if (!user) return;
     try {
-      console.log(' Refrescando perfil...');
+      console.log('🔄 Refrescando perfil...');
       await fetchProfile(user.id);
     } catch (error) {
-      console.error(' Error refrescando perfil:', error);
+      console.error('❌ Error refrescando perfil:', error);
     }
   };
 
@@ -432,7 +433,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // Verificar que el usuario tenga datos básicos
       if (!user || !user.id || !user.email) {
-        console.warn(' Usuario sin datos básicos');
+        console.warn('👤 Usuario sin datos básicos');
         return false;
       }
       
@@ -444,13 +445,13 @@ export const AuthProvider = ({ children }) => {
         .limit(1);
       
       if (error && error.code !== 'PGRST116') {
-        console.warn(' Error de conectividad con base de datos:', error);
+        console.warn('⚠️ Error de conectividad con base de datos:', error);
         return false;
       }
       
       return true;
     } catch (error) {
-      console.error(' Error validando sesión:', error);
+      console.error('❌ Error validando sesión:', error);
       return false;
     }
   };
