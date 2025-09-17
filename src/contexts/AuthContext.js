@@ -386,18 +386,19 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log(' Iniciando cierre de sesión...');
       
-      // Limpiar estado local primero para respuesta inmediata
+      // Cerrar sesión en Supabase PRIMERO
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error(' Error al cerrar sesión en Supabase:', error);
+      }
+      
+      // Limpiar estado local INMEDIATAMENTE después
+      console.log(' Limpiando estado local...');
       setUser(null);
       setProfile(null);
       setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
       setLoading(false);
-      
-      // Cerrar sesión en Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error(' Error al cerrar sesión en Supabase:', error);
-        // Aún así consideramos exitoso porque ya limpiamos el estado local
-      }
+      setError(null);
       
       // Limpiar datos almacenados como medida adicional
       try {
@@ -408,14 +409,34 @@ export const AuthProvider = ({ children }) => {
       }
       
       console.log(' Sesión cerrada exitosamente');
+      
+      // Forzar navegación inmediata para web
+      if (typeof window !== 'undefined') {
+        console.log(' Entorno web detectado - forzando recarga');
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      }
+      
       return { success: true };
     } catch (error) {
       console.error(' Error en signOut:', error);
+      
       // Aún así limpiar estado local
+      console.log(' Limpiando estado por error...');
       setUser(null);
       setProfile(null);
       setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
       setLoading(false);
+      setError(null);
+      
+      // Forzar recarga incluso en caso de error
+      if (typeof window !== 'undefined') {
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      }
+      
       return { success: false, error: error.message };
     }
   };
