@@ -13,18 +13,13 @@ const ProfileScreen = ({ navigation }) => {
   const { user, profile, signOut, refreshProfile } = useAuth();
 
   const handleLogout = () => {
-    Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro de que quieres cerrar sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Cerrar Sesión', 
-          onPress: () => signOut(), 
-          style: 'destructive' 
-        },
-      ]
-    );
+    console.log('--- BOTÓN CERRAR SESIÓN PRESIONADO ---');
+
+    // Usar confirmación nativa del navegador para máxima compatibilidad
+    if (window.confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+      console.log(' Confirmado. Llamando a signOut...');
+      signOut();
+    }
   };
 
   return (
@@ -36,8 +31,8 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.name}>{profile?.full_name || 'Usuario'}</Text>
         <Text style={styles.email}>{user?.email}</Text>
         <Text style={styles.role}>
-          {profile?.role === 'explorer' ? '🌱 Explorador' : 
-           profile?.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
+          {profile?.role === 'explorer' ? ' Explorador' : 
+           profile?.role === 'scientist' ? ' Científico' : ' Administrador'}
         </Text>
       </View>
 
@@ -80,7 +75,7 @@ const ProfileScreen = ({ navigation }) => {
         {(profile?.role === 'scientist' || profile?.role === 'admin') && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              {profile?.role === 'scientist' ? '🔬 Herramientas de Científico' : '⚙️ Herramientas de Administrador'}
+              {profile?.role === 'scientist' ? ' Herramientas de Científico' : ' Herramientas de Administrador'}
             </Text>
             <TouchableOpacity 
               style={styles.actionButton}

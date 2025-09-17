@@ -51,8 +51,13 @@ export const AuthProvider = ({ children }) => {
       if (!isMounted) return;
       
       console.log(`🔔 Evento de Auth recibido: ${_event}`);
+      
+      // Actualizar el usuario SIEMPRE
       setUser(session?.user ?? null);
+
+      // Si no hay sesión, limpiar todo y detener la carga
       if (!session?.user) {
+        console.log('🧹 No hay sesión, limpiando perfil y deteniendo carga.');
         setProfile(null);
         setLoading(false);
       }
