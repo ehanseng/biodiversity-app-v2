@@ -24,17 +24,31 @@ const ProfileScreen = ({ navigation }) => {
           onPress: async () => {
             try {
               console.log('🚪 Usuario confirmó cierre de sesión');
+              console.log('🔍 Estado antes del signOut - user:', !!user, 'profile:', !!profile);
+              
               const result = await signOut();
+              console.log('📋 Resultado de signOut:', result);
+              
               if (result?.success) {
                 console.log('✅ Sesión cerrada correctamente');
-                // La navegación se manejará automáticamente por el AuthContext
+                // Forzar navegación manual si el listener no funciona
+                setTimeout(() => {
+                  if (typeof window !== 'undefined') {
+                    console.log('🔄 Forzando recarga de página');
+                    window.location.reload();
+                  }
+                }, 1000);
               } else {
                 console.error('❌ Error al cerrar sesión:', result?.error);
                 Alert.alert('Error', `No se pudo cerrar la sesión: ${result?.error || 'Error desconocido'}`);
               }
             } catch (error) {
               console.error('❌ Error inesperado al cerrar sesión:', error);
-              Alert.alert('Error', 'Ocurrió un error inesperado. Inténtalo de nuevo.');
+              Alert.alert('Error', 'Ocurrió un error inesperado. Recargando página...');
+              // Forzar recarga como último recurso
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
             }
           }, 
           style: 'destructive' 
