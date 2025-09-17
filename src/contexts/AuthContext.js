@@ -74,7 +74,10 @@ export const AuthProvider = ({ children }) => {
             }
             
             await fetchProfile(session.user.id);
-            await performAutoSync(session.user.id);
+            // Ejecutar sincronización en paralelo sin bloquear
+            performAutoSync(session.user.id).catch(error => {
+              console.warn('⚠️ Sincronización falló pero no bloquea la carga:', error);
+            });
           } else {
             setLoading(false);
           }
@@ -107,7 +110,10 @@ export const AuthProvider = ({ children }) => {
         if (session?.user) {
           setUser(session.user);
           await fetchProfile(session.user.id);
-          await performAutoSync(session.user.id);
+          // Ejecutar sincronización en paralelo sin bloquear
+          performAutoSync(session.user.id).catch(error => {
+            console.warn('⚠️ Sincronización falló en auth change:', error);
+          });
         } else {
           setUser(null);
           setProfile(null);
@@ -130,11 +136,20 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('👤 Obteniendo perfil para:', userId);
       
-      const { data, error } = await supabase
+      // Agregar timeout para evitar colgarse
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout obteniendo perfil')), 10000);
+      });
+      
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
+      
+      console.log('📡 Ejecutando consulta de perfil...');
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+      console.log('📋 Resultado de consulta:', { hasData: !!data, error: error?.message, errorCode: error?.code });
 
       if (error) {
         console.error('❌ Error obteniendo perfil:', error);
@@ -144,13 +159,28 @@ export const AuthProvider = ({ children }) => {
           console.log('🆕 Creando perfil por defecto...');
           
           // Obtener información del usuario autenticado
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          console.log('👤 Obteniendo datos del usuario actual...');
+          const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+          
+          if (userError) {
+            console.error('❌ Error obteniendo usuario actual:', userError);
+            throw userError;
+          }
+          
+          console.log('📧 Usuario actual:', { 
+            id: currentUser?.id, 
+            email: currentUser?.email, 
+            hasMetadata: !!currentUser?.user_metadata 
+          });
+          
           const userEmail = currentUser?.email || 'usuario@ejemplo.com';
           const userName = currentUser?.user_metadata?.full_name || 
                           currentUser?.email?.split('@')[0] || 
                           'Usuario';
           
-          const { data: newProfile, error: createError } = await supabase
+          console.log('🏗️ Creando perfil con datos:', { userName, userEmail, userId });
+          
+          const createProfilePromise = supabase
             .from('profiles')
             .insert([
               {
@@ -163,6 +193,11 @@ export const AuthProvider = ({ children }) => {
             ])
             .select()
             .single();
+          
+          const { data: newProfile, error: createError } = await Promise.race([
+            createProfilePromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout creando perfil')), 10000))
+          ]);
 
           if (createError) {
             console.error('❌ Error creando perfil:', createError);
@@ -172,6 +207,7 @@ export const AuthProvider = ({ children }) => {
             setProfile(newProfile);
           }
         } else {
+          console.error('❌ Error de base de datos:', error);
           setError('Error obteniendo perfil de usuario');
         }
       } else {
@@ -180,8 +216,14 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('❌ Error inesperado obteniendo perfil:', error);
-      setError('Error inesperado obteniendo perfil');
+      if (error.message === 'Timeout obteniendo perfil' || error.message === 'Timeout creando perfil') {
+        console.error('⏰ Timeout detectado - posible problema de conectividad');
+        setError('Timeout de conexión. Verifica tu internet.');
+      } else {
+        setError('Error inesperado obteniendo perfil');
+      }
     } finally {
+      console.log('🏁 Finalizando fetchProfile, setting loading to false');
       setLoading(false);
     }
   };
@@ -220,24 +262,42 @@ export const AuthProvider = ({ children }) => {
   // Sincronización automática
   const performAutoSync = async (userId) => {
     try {
-      console.log(' Iniciando sincronización automática...');
+      console.log('🔄 Iniciando sincronización automática...');
       
-      // Obtener estadísticas antes de sincronizar
-      const statsBefore = await TreeStorageService.getSyncStats();
-      setSyncStats(statsBefore);
+      // Agregar timeout para sincronización
+      const syncTimeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout en sincronización')), 15000);
+      });
       
-      if (statsBefore.pending > 0) {
-        // Sincronizar árboles pendientes
-        const syncResult = await TreeStorageService.syncAllPendingTrees(userId);
+      const syncProcess = async () => {
+        // Obtener estadísticas antes de sincronizar
+        const statsBefore = await TreeStorageService.getSyncStats();
+        console.log('📊 Stats antes de sync:', statsBefore);
+        setSyncStats(statsBefore);
         
-        // Actualizar estadísticas después de sincronizar
-        const statsAfter = await TreeStorageService.getSyncStats();
-        setSyncStats(statsAfter);
-        
-        console.log(` Sincronización completada: ${syncResult.successful}/${syncResult.total} árboles sincronizados`);
-      }
+        if (statsBefore.pending > 0) {
+          console.log(`🌳 Sincronizando ${statsBefore.pending} árboles pendientes...`);
+          // Sincronizar árboles pendientes
+          const syncResult = await TreeStorageService.syncAllPendingTrees(userId);
+          
+          // Actualizar estadísticas después de sincronizar
+          const statsAfter = await TreeStorageService.getSyncStats();
+          setSyncStats(statsAfter);
+          
+          console.log(`✅ Sincronización completada: ${syncResult.successful}/${syncResult.total} árboles sincronizados`);
+        } else {
+          console.log('✅ No hay árboles pendientes para sincronizar');
+        }
+      };
+      
+      await Promise.race([syncProcess(), syncTimeout]);
+      
     } catch (error) {
-      console.error(' Error en sincronización automática:', error);
+      console.error('❌ Error en sincronización automática:', error);
+      if (error.message === 'Timeout en sincronización') {
+        console.warn('⏰ Timeout en sincronización - continuando sin bloquear');
+      }
+      // No bloquear el proceso principal si falla la sincronización
     }
   };
 
