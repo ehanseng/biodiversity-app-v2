@@ -103,10 +103,20 @@ class TreeStorageService {
   // Obtener árboles de la base de datos
   async getTreesFromDatabase() {
     try {
-      const { data, error } = await supabase
+      console.log('🔍 [TreeStorageService] Consultando árboles en base de datos...');
+      
+      // Timeout para esta consulta específica
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout en getTreesFromDatabase')), 3000);
+      });
+      
+      const queryPromise = supabase
         .from('trees')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200); // <-- OPTIMIZACIÓN: Limitar a los 200 más recientes
+
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
       if (error) throw error;
       
@@ -114,6 +124,9 @@ class TreeStorageService {
       return data || [];
     } catch (error) {
       console.error('❌ Error obteniendo árboles de BD:', error);
+      if (error.message === 'Timeout en getTreesFromDatabase') {
+        console.warn('⏰ Timeout en consulta de BD - continuando sin árboles de BD');
+      }
       return [];
     }
   }
@@ -158,30 +171,36 @@ class TreeStorageService {
     try {
       console.log('🔍 [TreeStorageService] getAllTrees - User ID:', userId);
       
-      const [localTrees, databaseTrees] = await Promise.all([
+      // Timeout para evitar colgarse
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout en getAllTrees')), 5000);
+      });
+      
+      const dataPromise = Promise.all([
         this.getLocalTrees(),
         this.getTreesFromDatabase()
       ]);
+      
+      const [localTrees, databaseTrees] = await Promise.race([dataPromise, timeoutPromise]);
 
       console.log('🔍 [TreeStorageService] Árboles locales:', localTrees.length);
       console.log('🔍 [TreeStorageService] Árboles de BD:', databaseTrees.length);
 
       // Los árboles locales son aquellos que no se han enviado al servidor
       const localTreesOnly = localTrees.filter(tree => 
-        !tree.databaseId // Si no tiene databaseId, es puramente local
-      );
+        tree.syncStatus === 'pending' || tree.syncStatus === 'error'
+      ).map(tree => ({
+        ...tree,
+        source: 'local',
+        canEdit: true
+      }));
 
-      console.log('🔍 [TreeStorageService] Árboles puramente locales:', localTreesOnly.length);
-
+      // Combinar árboles locales y de base de datos
       const allTrees = [
-        ...localTreesOnly.map(tree => ({ 
-          ...tree, 
-          source: 'local', 
-          canEdit: true 
-        })),
-        ...databaseTrees.map(tree => ({ 
-          ...tree, 
-          source: 'database', 
+        ...localTreesOnly,
+        ...databaseTrees.map(tree => ({
+          ...tree,
+          source: 'database',
           canEdit: tree.user_id === userId 
         }))
       ];
@@ -195,6 +214,23 @@ class TreeStorageService {
       return allTrees;
     } catch (error) {
       console.error('❌ [TreeStorageService] Error obteniendo todos los árboles:', error);
+      
+      // Si hay timeout, intentar solo con árboles locales
+      if (error.message === 'Timeout en getAllTrees') {
+        console.log('⏰ Timeout detectado, cargando solo árboles locales...');
+        try {
+          const localTrees = await this.getLocalTrees();
+          return localTrees.map(tree => ({
+            ...tree,
+            source: 'local',
+            canEdit: true
+          }));
+        } catch (localError) {
+          console.error('❌ Error cargando árboles locales:', localError);
+          return [];
+        }
+      }
+      
       return [];
     }
   }

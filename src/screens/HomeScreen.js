@@ -29,6 +29,14 @@ const HomeScreen = ({ navigation }) => {
     loadTreeStats();
   }, [syncStats]);
 
+  // Cargar stats cuando el usuario esté disponible
+  useEffect(() => {
+    if (user?.id) {
+      console.log('👤 Usuario disponible, cargando stats iniciales...');
+      loadTreeStats();
+    }
+  }, [user?.id]);
+
   // Escuchar eventos de cambios en árboles
   useEffect(() => {
     const unsubscribeTreeCreated = eventEmitter.on(EVENTS.TREE_CREATED, () => {
@@ -66,7 +74,9 @@ const HomeScreen = ({ navigation }) => {
 
   const loadTreeStats = async () => {
     try {
+      console.log('📊 Cargando estadísticas de árboles para usuario:', user?.id);
       const allTrees = await TreeStorageService.getAllTrees(user?.id);
+      console.log('🌳 Árboles obtenidos:', allTrees.length);
       
       // Calcular estadísticas usando la lógica simplificada
       const myTrees = allTrees.filter(tree => 
@@ -80,20 +90,20 @@ const HomeScreen = ({ navigation }) => {
       
       // Solo MIS árboles aprobados
       const myApprovedTrees = allTrees.filter(tree => {
-        const isOwn = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
-        return isOwn && tree.approval_status === 'approved';
+        const isMine = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
+        return isMine && tree.approval_status === 'approved';
       }).length;
       
       // Solo MIS árboles pendientes
       const myPendingTrees = allTrees.filter(tree => {
-        const isOwn = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
-        return isOwn && tree.approval_status === 'pending';
+        const isMine = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
+        return isMine && tree.approval_status === 'pending';
       }).length;
       
       // Solo MIS árboles rechazados
       const myRejectedTrees = allTrees.filter(tree => {
-        const isOwn = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
-        return isOwn && tree.approval_status === 'rejected';
+        const isMine = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
+        return isMine && tree.approval_status === 'rejected';
       }).length;
       
       // Árboles locales (no enviados al servidor)
@@ -101,16 +111,19 @@ const HomeScreen = ({ navigation }) => {
         tree.source === 'local'
       ).length;
 
-      setTreeStats({
+      const newStats = {
         totalTrees: totalApprovedTrees, // Solo árboles aprobados en "Todos"
         myTrees: myTrees,
         approvedTrees: myApprovedTrees, // Solo mis árboles aprobados
         pendingTrees: myPendingTrees, // Solo mis árboles pendientes
         rejectedTrees: myRejectedTrees, // Solo mis árboles rechazados
         localTrees: localTrees,
-      });
+      };
+
+      console.log('📈 Estadísticas calculadas:', newStats);
+      setTreeStats(newStats);
     } catch (error) {
-      console.error('Error loading tree stats:', error);
+      console.error('❌ Error loading tree stats:', error);
     }
   };
 
@@ -194,8 +207,13 @@ const HomeScreen = ({ navigation }) => {
             onPress={handleManualSync}
             disabled={syncing}
           >
-            <Text style={styles.syncButtonText}>
-              {syncing ? 'Sincronizando...' : 'Sincronizar'}
+            <Ionicons 
+              name={syncing ? "sync" : "cloud-download-outline"} 
+              size={20} 
+              color={syncing ? "#6c757d" : "#ffffff"} 
+            />
+            <Text style={[styles.syncButtonText, syncing && styles.syncButtonTextDisabled]}>
+              {syncing ? 'Sincronizando...' : 'Sincronizar Árboles'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -374,6 +392,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  syncButtonTextDisabled: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.5,
   },
   spinning: {
     // Aquí podrías agregar una animación de rotación si quieres

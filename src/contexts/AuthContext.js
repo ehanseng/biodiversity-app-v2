@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase, clearCorruptedSession } from '../config/supabase';
 import TreeStorageService from '../services/TreeStorageService';
+import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
 const AuthContext = createContext({});
 
@@ -20,118 +21,96 @@ export const AuthProvider = ({ children }) => {
   const [syncStats, setSyncStats] = useState({ total: 0, pending: 0, synced: 0, errors: 0 });
 
   useEffect(() => {
-    console.log('🔐 AuthProvider iniciando...');
-    let mounted = true;
+    console.log('🔐 AuthProvider montado. Verificando sesión...');
+    let isMounted = true;
 
-    const initializeAuth = async () => {
+    const checkSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (mounted) {
-          setUser(session?.user ?? null);
-          
+        if (isMounted) {
           if (session?.user) {
+            console.log('✅ Sesión activa encontrada. Cargando datos...');
+            setUser(session.user);
             await fetchProfile(session.user.id);
-            // Sincronización automática
             performAutoSync(session.user.id).catch(console.warn);
           } else {
+            console.log('❌ No hay sesión activa.');
             setLoading(false);
           }
         }
-      } catch (error) {
-        console.error('Error inicializando auth:', error);
-        if (mounted) {
-          setLoading(false);
-        }
+      } catch (e) {
+        console.error('🚨 Error crítico verificando sesión:', e);
+        if (isMounted) setLoading(false);
       }
     };
 
-    initializeAuth();
+    checkSession();
 
-    // Auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-        
-        if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
-          setLoading(false);
-          return;
-        }
-        
-        if (session?.user) {
-          setUser(session.user);
-          await fetchProfile(session.user.id);
-          performAutoSync(session.user.id).catch(console.warn);
-        } else {
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
+      
+      console.log(`🔔 Evento de Auth recibido: ${_event}`);
+      setUser(session?.user ?? null);
+      if (!session?.user) {
+        setProfile(null);
+        setLoading(false);
       }
-    );
+    });
 
     return () => {
-      mounted = false;
+      console.log('🧹 AuthProvider desmontado. Limpiando suscripción.');
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
   const fetchProfile = async (userId) => {
+    console.log('📝 Iniciando fetchProfile para:', userId);
     try {
-      console.log('👤 Obteniendo perfil para:', userId);
-      
+      console.log('📡 Consultando perfil en base de datos...');
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) {
-        console.error('❌ Error obteniendo perfil:', error);
-        
-        // Si el perfil no existe, crear uno por defecto
-        if (error.code === 'PGRST116') {
-          console.log('🆕 Creando perfil por defecto...');
-          
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          const userName = currentUser?.user_metadata?.full_name || 
-                          currentUser?.email?.split('@')[0] || 
-                          'Usuario';
-          
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert([
-              {
-                id: userId,
-                full_name: userName,
-                role: 'explorer',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              },
-            ])
-            .select()
-            .single();
+      console.log('📊 Resultado consulta:', { hasData: !!data, hasError: !!error, errorCode: error?.code });
 
-          if (createError) {
-            console.error('❌ Error creando perfil:', createError);
-          } else {
-            console.log('✅ Perfil creado:', newProfile);
-            setProfile(newProfile);
-          }
+      if (error && error.code === 'PGRST116') {
+        console.log('🆕 Creando perfil por defecto...');
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        const userName = currentUser?.user_metadata?.full_name || 
+                        currentUser?.email?.split('@')[0] || 
+                        'Usuario';
+        
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: userId,
+              full_name: userName,
+              role: 'explorer',
+              created_at: new Date().toISOString(),
+            },
+          ])
+          .select()
+          .single();
+
+        if (newProfile) {
+          console.log('✅ Perfil creado exitosamente');
+          setProfile(newProfile);
         }
-      } else {
-        console.log('✅ Perfil obtenido:', data?.role, data?.full_name);
+      } else if (!error) {
+        console.log('✅ Perfil obtenido exitosamente');
         setProfile(data);
       }
     } catch (error) {
-      console.error('❌ Error obteniendo perfil:', error);
-      // No mostrar error al usuario, la app sigue funcionando
-    } finally {
-      setLoading(false);
+      console.error('❌ Error en fetchProfile:', error);
     }
+    
+    console.log('🏁 Terminando fetchProfile - setLoading(false)');
+    setLoading(false);
   };
 
   // Función para reintentar inicialización
@@ -220,12 +199,30 @@ export const AuthProvider = ({ children }) => {
 
   // Función para forzar sincronización manual
   const forceSyncTrees = async () => {
-    if (!user) return;
+    if (!user) {
+      console.warn('⚠️ No hay usuario para forzar sync');
+      return false;
+    }
+    
+    console.log('⚡ Forzando sincronización manual...');
     try {
-      await performAutoSync(user.id);
+      // Primero, intentar obtener árboles de la base de datos
+      const dbTrees = await TreeStorageService.getTreesFromDatabase();
+      console.log(`☁️ ${dbTrees.length} árboles obtenidos de la nube.`);
+      
+      // Luego, sincronizar los árboles locales pendientes
+      const localStats = await TreeStorageService.getSyncStats();
+      if (localStats.pending > 0) {
+        console.log(`📤 Sincronizando ${localStats.pending} árboles locales...`);
+        await TreeStorageService.syncAllPendingTrees(user.id);
+      }
+      
+      // Finalmente, emitir evento para que la UI se actualice
+      eventEmitter.emit(EVENTS.DATA_REFRESH_NEEDED);
+      console.log('✅ Sincronización manual completada.');
       return true;
     } catch (error) {
-      console.error(' Error en sincronización manual:', error);
+      console.error('❌ Error en sincronización manual forzada:', error);
       return false;
     }
   };

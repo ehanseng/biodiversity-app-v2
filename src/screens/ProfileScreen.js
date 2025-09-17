@@ -12,20 +12,15 @@ import { useAuth } from '../contexts/AuthContext';
 const ProfileScreen = ({ navigation }) => {
   const { user, profile, signOut, refreshProfile } = useAuth();
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     Alert.alert(
       'Cerrar Sesión',
-      '¿Estás seguro que deseas cerrar sesión?',
+      '¿Estás seguro de que quieres cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Cerrar Sesión', 
-          onPress: async () => {
-            const result = await signOut();
-            if (!result.success) {
-              Alert.alert('Error', 'No se pudo cerrar la sesión');
-            }
-          }, 
+          onPress: () => signOut(), 
           style: 'destructive' 
         },
       ]
