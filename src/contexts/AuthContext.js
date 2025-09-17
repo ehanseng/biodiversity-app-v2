@@ -98,17 +98,15 @@ export const AuthProvider = ({ children }) => {
     // Inicializar autenticación
     initializeAuth();
 
-    // Listen for auth changes
+    // Listen for auth changes - RESTAURADO PERO SIMPLIFICADO
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(' Cambio de estado auth:', event);
+        console.log('🔄 Auth change:', event);
         
         if (!mounted) return;
         
-        setError(null); // Limpiar errores previos
-        
         if (event === 'SIGNED_OUT') {
-          console.log(' Usuario cerró sesión - limpiando estado');
+          console.log('🚪 Usuario cerró sesión');
           setUser(null);
           setProfile(null);
           setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
@@ -117,18 +115,12 @@ export const AuthProvider = ({ children }) => {
         }
         
         if (session?.user) {
-          console.log(' Usuario autenticado:', session.user.email);
+          console.log('👤 Usuario autenticado:', session.user.email);
           setUser(session.user);
           await fetchProfile(session.user.id);
-          // Ejecutar sincronización en paralelo sin bloquear
-          performAutoSync(session.user.id).catch(error => {
-            console.warn(' Sincronización falló en auth change:', error);
-          });
         } else {
-          console.log(' Sin sesión de usuario');
           setUser(null);
           setProfile(null);
-          setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
           setLoading(false);
         }
       }
