@@ -69,21 +69,62 @@ export const clearCorruptedSession = async () => {
     console.log('🧹 Limpiando datos de sesión corruptos...');
     
     if (Platform.OS === 'web') {
-      // Limpiar localStorage en web
+      // Limpiar localStorage en web de forma más agresiva
       const keysToRemove = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.includes('supabase')) {
+        if (key && (
+          key.includes('supabase') || 
+          key.includes('auth') || 
+          key.includes('session') ||
+          key.includes('token')
+        )) {
           keysToRemove.push(key);
         }
       }
-      keysToRemove.forEach(key => localStorage.removeItem(key));
+      keysToRemove.forEach(key => {
+        console.log('🗑️ Removiendo clave:', key);
+        localStorage.removeItem(key);
+      });
+      
+      // También limpiar sessionStorage
+      const sessionKeysToRemove = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (
+          key.includes('supabase') || 
+          key.includes('auth') || 
+          key.includes('session') ||
+          key.includes('token')
+        )) {
+          sessionKeysToRemove.push(key);
+        }
+      }
+      sessionKeysToRemove.forEach(key => {
+        console.log('🗑️ Removiendo clave de session:', key);
+        sessionStorage.removeItem(key);
+      });
+      
     } else {
       // Limpiar SecureStore en móvil
-      await SecureStore.deleteItemAsync('supabase.auth.token');
+      const keysToTry = [
+        'supabase.auth.token',
+        'supabase.session',
+        'supabase.user',
+        '@supabase/auth-token',
+      ];
+      
+      for (const key of keysToTry) {
+        try {
+          await SecureStore.deleteItemAsync(key);
+          console.log('🗑️ Removida clave móvil:', key);
+        } catch (error) {
+          // Ignorar errores si la clave no existe
+        }
+      }
     }
     
-    console.log('✅ Datos de sesión limpiados');
+    console.log('✅ Datos de sesión limpiados completamente');
     return true;
   } catch (error) {
     console.error('❌ Error limpiando sesión:', error);

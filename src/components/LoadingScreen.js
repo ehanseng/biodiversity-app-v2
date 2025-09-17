@@ -17,7 +17,7 @@ const LoadingScreen = () => {
   const handleClearData = () => {
     Alert.alert(
       'Limpiar Datos',
-      '¿Estás seguro que deseas limpiar los datos de sesión? Esto cerrará tu sesión actual.',
+      '¿Estás seguro que deseas limpiar los datos de sesión? Esto cerrará tu sesión actual y resolverá problemas de carga.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -25,8 +25,12 @@ const LoadingScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('🧹 Limpiando datos desde LoadingScreen...');
               await clearCorruptedSession();
-              window.location.reload(); // Recargar página en web
+              // Recargar página para reinicio completo
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
             } catch (error) {
               console.error('Error limpiando datos:', error);
               Alert.alert('Error', 'No se pudieron limpiar los datos');
@@ -67,6 +71,8 @@ const LoadingScreen = () => {
           
           <Text style={styles.helpText}>
             Si el problema persiste, intenta refrescar la página o limpiar los datos de sesión.
+            {'\n\n'}
+            💡 Tip: Si acabas de actualizar la aplicación, es recomendable limpiar los datos para evitar conflictos.
           </Text>
         </View>
       </View>

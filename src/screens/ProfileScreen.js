@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { clearCorruptedSession } from '../config/supabase';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, profile, signOut, refreshProfile } = useAuth();
@@ -37,6 +38,33 @@ const ProfileScreen = ({ navigation }) => {
             }
           }, 
           style: 'destructive' 
+        },
+      ]
+    );
+  };
+
+  const handleClearSession = () => {
+    Alert.alert(
+      'Limpiar Sesión',
+      '¿Estás seguro? Esto cerrará tu sesión y limpiará todos los datos almacenados. Tendrás que iniciar sesión nuevamente.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpiar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🧹 Usuario solicitó limpiar sesión...');
+              await clearCorruptedSession();
+              // Recargar la página para forzar reinicio completo
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
+            } catch (error) {
+              console.error('❌ Error limpiando sesión:', error);
+              Alert.alert('Error', 'No se pudo limpiar la sesión');
+            }
+          },
         },
       ]
     );
@@ -73,6 +101,12 @@ const ProfileScreen = ({ navigation }) => {
           <Ionicons name="refresh-outline" size={24} color="#2d5016" />
           <Text style={styles.menuText}>Actualizar Perfil</Text>
           <Ionicons name="chevron-forward" size={20} color="#6c757d" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={handleClearSession}>
+          <Ionicons name="trash-outline" size={24} color="#dc3545" />
+          <Text style={[styles.menuText, { color: '#dc3545' }]}>Limpiar Sesión</Text>
+          <Ionicons name="chevron-forward" size={20} color="#dc3545" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>

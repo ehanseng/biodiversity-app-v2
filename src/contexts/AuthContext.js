@@ -35,16 +35,16 @@ export const AuthProvider = ({ children }) => {
 
     const initializeAuth = async () => {
       try {
-        console.log(' Obteniendo sesión inicial...');
+        console.log('🔐 Obteniendo sesión inicial...');
         
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.error(' Error obteniendo sesión:', sessionError);
+          console.error('❌ Error obteniendo sesión:', sessionError);
           
           // Si hay error de sesión, intentar limpiar datos corruptos
           if (sessionError.message?.includes('invalid') || sessionError.message?.includes('expired')) {
-            console.log(' Intentando limpiar sesión corrupta...');
+            console.log('🧹 Intentando limpiar sesión corrupta...');
             await clearCorruptedSession();
           }
           
@@ -56,10 +56,23 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (mounted) {
-          console.log(' Sesión obtenida:', session ? 'Usuario logueado' : 'Sin usuario');
+          console.log('📋 Sesión obtenida:', session ? 'Usuario logueado' : 'Sin usuario');
           setUser(session?.user ?? null);
           
           if (session?.user) {
+            // Validar integridad de la sesión
+            const isValidSession = await validateSessionIntegrity(session.user);
+            if (!isValidSession) {
+              console.warn('⚠️ Sesión inválida detectada, limpiando...');
+              await clearCorruptedSession();
+              if (mounted) {
+                setUser(null);
+                setProfile(null);
+                setLoading(false);
+              }
+              return;
+            }
+            
             await fetchProfile(session.user.id);
             await performAutoSync(session.user.id);
           } else {
@@ -68,7 +81,7 @@ export const AuthProvider = ({ children }) => {
         }
         
       } catch (error) {
-        console.error(' Error inicializando auth:', error);
+        console.error('❌ Error inicializando auth:', error);
         if (mounted) {
           setError('Error de conexión. Verifica tu internet e intenta de nuevo.');
           setLoading(false);
@@ -327,6 +340,34 @@ export const AuthProvider = ({ children }) => {
       await fetchProfile(user.id);
     } catch (error) {
       console.error('❌ Error refrescando perfil:', error);
+    }
+  };
+
+  // Función para validar integridad de sesión
+  const validateSessionIntegrity = async (user) => {
+    try {
+      // Verificar que el usuario tenga datos básicos
+      if (!user || !user.id || !user.email) {
+        console.warn('⚠️ Usuario sin datos básicos');
+        return false;
+      }
+      
+      // Intentar hacer una consulta simple para verificar conectividad
+      const { error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .limit(1);
+      
+      if (error && error.code !== 'PGRST116') {
+        console.warn('⚠️ Error de conectividad con base de datos:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Error validando sesión:', error);
+      return false;
     }
   };
 
