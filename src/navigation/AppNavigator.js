@@ -56,9 +56,9 @@ const MainTabs = () => {
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else if (route.name === 'Add Tree') {
-            iconName = focused ? 'ios-add-circle' : 'ios-add-circle-outline';
+            iconName = focused ? 'add-circle' : 'add-circle-outline';
           } else if (route.name === 'Add Animal') {
-            iconName = focused ? 'ios-add-circle' : 'ios-add-circle-outline';
+            iconName = focused ? 'add-circle' : 'add-circle-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;

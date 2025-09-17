@@ -394,8 +394,8 @@ const styles = StyleSheet.create({
   },
   statCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
     padding: 15,
+    borderRadius: 10,
     width: '48%',
     marginBottom: 10,
     borderLeftWidth: 4,
@@ -407,6 +407,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     elevation: 5,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   },
   statNumber: {
     fontSize: 24,
