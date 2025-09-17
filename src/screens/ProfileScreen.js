@@ -10,15 +10,34 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 
 const ProfileScreen = ({ navigation }) => {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refreshProfile } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     Alert.alert(
       'Cerrar Sesión',
       '¿Estás seguro que deseas cerrar sesión?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar Sesión', onPress: signOut, style: 'destructive' },
+        { 
+          text: 'Cerrar Sesión', 
+          onPress: async () => {
+            try {
+              console.log('🚪 Usuario confirmó cierre de sesión');
+              const result = await signOut();
+              if (result?.success) {
+                console.log('✅ Sesión cerrada correctamente');
+                // La navegación se manejará automáticamente por el AuthContext
+              } else {
+                console.error('❌ Error al cerrar sesión:', result?.error);
+                Alert.alert('Error', `No se pudo cerrar la sesión: ${result?.error || 'Error desconocido'}`);
+              }
+            } catch (error) {
+              console.error('❌ Error inesperado al cerrar sesión:', error);
+              Alert.alert('Error', 'Ocurrió un error inesperado. Inténtalo de nuevo.');
+            }
+          }, 
+          style: 'destructive' 
+        },
       ]
     );
   };
@@ -47,6 +66,12 @@ const ProfileScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.menuItem}>
           <Ionicons name="help-circle-outline" size={24} color="#2d5016" />
           <Text style={styles.menuText}>Ayuda</Text>
+          <Ionicons name="chevron-forward" size={20} color="#6c757d" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={refreshProfile}>
+          <Ionicons name="refresh-outline" size={24} color="#2d5016" />
+          <Text style={styles.menuText}>Actualizar Perfil</Text>
           <Ionicons name="chevron-forward" size={20} color="#6c757d" />
         </TouchableOpacity>
 

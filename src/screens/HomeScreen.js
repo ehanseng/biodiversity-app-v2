@@ -13,7 +13,7 @@ import TreeStorageService from '../services/TreeStorageService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
 const HomeScreen = ({ navigation }) => {
-  const { user, profile, syncStats, forceSyncTrees } = useAuth();
+  const { user, profile, syncStats, forceSyncTrees, refreshProfile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [treeStats, setTreeStats] = useState({
     totalTrees: 0,
@@ -158,12 +158,18 @@ const HomeScreen = ({ navigation }) => {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>
-          ¡Hola, {profile?.full_name || 'Usuario'}!
+        <Text style={styles.greeting}>
+          ¡Hola, {profile?.full_name || user?.email?.split('@')[0] || 'Usuario'}!
         </Text>
-        <Text style={styles.roleText}>
-          {getRoleDisplayName(profile?.role)}
+        <Text style={styles.subtitle}>
+          {profile?.full_name ? profile.full_name : (user?.email || 'Usuario sin email')}
         </Text>
+        {profile?.role && (
+          <Text style={styles.roleText}>
+            {profile.role === 'explorer' ? '🌱 Explorador' : 
+             profile.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
+          </Text>
+        )}
       </View>
 
       {/* Indicador de Sincronización */}
@@ -316,11 +322,16 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 40,
   },
-  welcomeText: {
+  greeting: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
     marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#ffffff',
+    opacity: 0.9,
   },
   roleText: {
     fontSize: 16,

@@ -3,7 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
+import LoadingScreen from '../components/LoadingScreen';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -101,11 +101,7 @@ const AppNavigator = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2d5016" />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   return user ? <MainStack /> : <AuthStack />;
