@@ -20,96 +20,40 @@ export const AuthProvider = ({ children }) => {
   const [syncStats, setSyncStats] = useState({ total: 0, pending: 0, synced: 0, errors: 0 });
 
   useEffect(() => {
-    console.log(' AuthProvider iniciando...');
-    let timeoutId;
+    console.log('🔐 AuthProvider iniciando...');
     let mounted = true;
-
-    // Timeout para evitar loading infinito
-    timeoutId = setTimeout(() => {
-      if (mounted) {
-        console.warn(' Timeout de autenticación - forzando fin de loading');
-        setLoading(false);
-      }
-    }, 30000);
 
     const initializeAuth = async () => {
       try {
-        console.log(' Obteniendo sesión inicial...');
+        const { data: { session } } = await supabase.auth.getSession();
         
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error(' Error obteniendo sesión:', sessionError);
-          
-          // Si hay error de sesión, intentar limpiar datos corruptos
-          if (sessionError.message?.includes('invalid') || sessionError.message?.includes('expired')) {
-            console.log(' Intentando limpiar sesión corrupta...');
-            await clearCorruptedSession();
-          }
-          
-          if (mounted) {
-            setError('Error de sesión. Intenta iniciar sesión nuevamente.');
-            setLoading(false);
-          }
-          return;
-        }
-
         if (mounted) {
-          console.log(' Sesión obtenida:', session ? 'Usuario logueado' : 'Sin usuario');
           setUser(session?.user ?? null);
           
           if (session?.user) {
-            // Validar integridad de la sesión
-            const isValidSession = await validateSessionIntegrity(session.user);
-            if (!isValidSession) {
-              console.warn(' Sesión inválida detectada, limpiando...');
-              await clearCorruptedSession();
-              if (mounted) {
-                setUser(null);
-                setProfile(null);
-                setLoading(false);
-              }
-              return;
-            }
-            
             await fetchProfile(session.user.id);
-            // Ejecutar sincronización inmediatamente
-            console.log('🔄 Iniciando sincronización automática...');
-            performAutoSync(session.user.id).then(() => {
-              console.log('✅ Sincronización completada');
-            }).catch(error => {
-              console.warn('⚠️ Sincronización falló pero no bloquea la carga:', error);
-            });
+            // Sincronización automática
+            performAutoSync(session.user.id).catch(console.warn);
           } else {
             setLoading(false);
           }
         }
-        
       } catch (error) {
-        console.error(' Error inicializando auth:', error);
+        console.error('Error inicializando auth:', error);
         if (mounted) {
-          setError('Error de conexión. Verifica tu internet e intenta de nuevo.');
           setLoading(false);
-        }
-      } finally {
-        if (timeoutId) {
-          clearTimeout(timeoutId);
         }
       }
     };
 
-    // Inicializar autenticación
     initializeAuth();
 
-    // Listen for auth changes - RESTAURADO PERO SIMPLIFICADO
+    // Auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth change:', event);
-        
         if (!mounted) return;
         
         if (event === 'SIGNED_OUT') {
-          console.log('🚪 Usuario cerró sesión');
           setUser(null);
           setProfile(null);
           setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
@@ -118,9 +62,9 @@ export const AuthProvider = ({ children }) => {
         }
         
         if (session?.user) {
-          console.log('👤 Usuario autenticado:', session.user.email);
           setUser(session.user);
           await fetchProfile(session.user.id);
+          performAutoSync(session.user.id).catch(console.warn);
         } else {
           setUser(null);
           setProfile(null);
@@ -131,9 +75,6 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       mounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       subscription.unsubscribe();
     };
   }, []);
