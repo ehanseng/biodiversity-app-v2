@@ -47,17 +47,25 @@ export const AuthProvider = ({ children }) => {
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!isMounted) return;
       
       console.log(`🔔 Evento de Auth recibido: ${_event}`);
       
-      // Actualizar el usuario SIEMPRE
-      setUser(session?.user ?? null);
-
-      // Si no hay sesión, limpiar todo y detener la carga
-      if (!session?.user) {
-        console.log('🧹 No hay sesión, limpiando perfil y deteniendo carga.');
+      // Si hay un usuario en la sesión, cargar sus datos
+      if (session?.user) {
+        // Evitar recargar si el usuario ya es el mismo
+        if (user?.id !== session.user.id) {
+          console.log('✨ Nuevo usuario detectado. Cargando datos...');
+          setUser(session.user);
+          await fetchProfile(session.user.id);
+          performAutoSync(session.user.id).catch(console.warn);
+        }
+      } 
+      // Si NO hay sesión, limpiar todo
+      else {
+        console.log('🧹 No hay sesión, limpiando estado.');
+        setUser(null);
         setProfile(null);
         setLoading(false);
       }
