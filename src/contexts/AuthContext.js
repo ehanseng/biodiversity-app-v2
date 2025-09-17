@@ -73,9 +73,12 @@ export const AuthProvider = ({ children }) => {
             }
             
             await fetchProfile(session.user.id);
-            // Ejecutar sincronización en paralelo sin bloquear
-            performAutoSync(session.user.id).catch(error => {
-              console.warn(' Sincronización falló pero no bloquea la carga:', error);
+            // Ejecutar sincronización inmediatamente
+            console.log('🔄 Iniciando sincronización automática...');
+            performAutoSync(session.user.id).then(() => {
+              console.log('✅ Sincronización completada');
+            }).catch(error => {
+              console.warn('⚠️ Sincronización falló pero no bloquea la carga:', error);
             });
           } else {
             setLoading(false);

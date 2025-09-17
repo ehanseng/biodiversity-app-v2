@@ -21,8 +21,25 @@ const ProfileScreen = ({ navigation }) => {
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Cerrar Sesión', 
-          onPress: () => {
-            signOut();
+          onPress: async () => {
+            try {
+              console.log('🚪 Iniciando cierre de sesión directo...');
+              
+              // Método directo: limpiar todo y recargar
+              await clearCorruptedSession();
+              
+              // Recargar página inmediatamente
+              if (typeof window !== 'undefined') {
+                console.log('🔄 Recargando página...');
+                window.location.reload();
+              }
+            } catch (error) {
+              console.error('❌ Error:', error);
+              // Forzar recarga incluso con error
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
+            }
           }, 
           style: 'destructive' 
         },
