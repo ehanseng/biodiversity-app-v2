@@ -145,53 +145,27 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (userId) => {
     try {
-      console.log(' Obteniendo perfil para:', userId);
+      console.log('👤 Obteniendo perfil para:', userId);
       
-      // Agregar timeout más largo para evitar problemas de conectividad
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout obteniendo perfil')), 20000); // 20 segundos en lugar de 10
-      });
-      
-      const profilePromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
-      
-      console.log(' Ejecutando consulta de perfil...');
-      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
-      console.log(' Resultado de consulta:', { hasData: !!data, error: error?.message, errorCode: error?.code });
 
       if (error) {
-        console.error(' Error obteniendo perfil:', error);
+        console.error('❌ Error obteniendo perfil:', error);
         
         // Si el perfil no existe, crear uno por defecto
         if (error.code === 'PGRST116') {
-          console.log(' Creando perfil por defecto...');
+          console.log('🆕 Creando perfil por defecto...');
           
-          // Obtener información del usuario autenticado
-          console.log(' Obteniendo datos del usuario actual...');
-          const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-          
-          if (userError) {
-            console.error(' Error obteniendo usuario actual:', userError);
-            throw userError;
-          }
-          
-          console.log(' Usuario actual:', { 
-            id: currentUser?.id, 
-            email: currentUser?.email, 
-            hasMetadata: !!currentUser?.user_metadata 
-          });
-          
-          const userEmail = currentUser?.email || 'usuario@ejemplo.com';
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
           const userName = currentUser?.user_metadata?.full_name || 
                           currentUser?.email?.split('@')[0] || 
                           'Usuario';
           
-          console.log(' Creando perfil con datos:', { userName, userEmail, userId });
-          
-          const createProfilePromise = supabase
+          const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert([
               {
@@ -204,40 +178,22 @@ export const AuthProvider = ({ children }) => {
             ])
             .select()
             .single();
-          
-          const { data: newProfile, error: createError } = await Promise.race([
-            createProfilePromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout creando perfil')), 15000))
-          ]);
 
           if (createError) {
-            console.error(' Error creando perfil:', createError);
-            setError('Error creando perfil de usuario');
+            console.error('❌ Error creando perfil:', createError);
           } else {
-            console.log(' Perfil creado exitosamente:', newProfile);
+            console.log('✅ Perfil creado:', newProfile);
             setProfile(newProfile);
-          }
-        } else {
-          console.error(' Error de base de datos:', error);
-          // No mostrar error si es timeout, la app sigue funcionando
-          if (error.message !== 'Timeout obteniendo perfil') {
-            setError('Error obteniendo perfil de usuario');
           }
         }
       } else {
-        console.log(' Perfil obtenido:', data?.role, data?.full_name);
+        console.log('✅ Perfil obtenido:', data?.role, data?.full_name);
         setProfile(data);
       }
     } catch (error) {
-      console.error(' Error inesperado obteniendo perfil:', error);
-      if (error.message === 'Timeout obteniendo perfil' || error.message === 'Timeout creando perfil') {
-        console.warn(' Timeout detectado - continuando sin bloquear la app');
-        // No mostrar error al usuario si es solo timeout
-      } else {
-        setError('Error inesperado obteniendo perfil');
-      }
+      console.error('❌ Error obteniendo perfil:', error);
+      // No mostrar error al usuario, la app sigue funcionando
     } finally {
-      console.log(' Finalizando fetchProfile, setting loading to false');
       setLoading(false);
     }
   };
@@ -384,59 +340,26 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      console.log(' Iniciando cierre de sesión...');
+      console.log(' Cerrando sesión...');
       
-      // Cerrar sesión en Supabase PRIMERO
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error(' Error al cerrar sesión en Supabase:', error);
-      }
+      // Cerrar sesión en Supabase
+      await supabase.auth.signOut();
       
-      // Limpiar estado local INMEDIATAMENTE después
-      console.log(' Limpiando estado local...');
+      // Limpiar estado inmediatamente
       setUser(null);
       setProfile(null);
       setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
       setLoading(false);
       setError(null);
       
-      // Limpiar datos almacenados como medida adicional
-      try {
-        await clearCorruptedSession();
-        console.log(' Datos de sesión limpiados');
-      } catch (cleanError) {
-        console.warn(' Error limpiando datos de sesión:', cleanError);
-      }
-      
-      console.log(' Sesión cerrada exitosamente');
-      
-      // Forzar navegación inmediata para web
-      if (typeof window !== 'undefined') {
-        console.log(' Entorno web detectado - forzando recarga');
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      }
+      // Recargar página inmediatamente
+      window.location.reload();
       
       return { success: true };
     } catch (error) {
-      console.error(' Error en signOut:', error);
-      
-      // Aún así limpiar estado local
-      console.log(' Limpiando estado por error...');
-      setUser(null);
-      setProfile(null);
-      setSyncStats({ total: 0, pending: 0, synced: 0, errors: 0 });
-      setLoading(false);
-      setError(null);
-      
-      // Forzar recarga incluso en caso de error
-      if (typeof window !== 'undefined') {
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      }
-      
+      console.error(' Error:', error);
+      // Forzar recarga incluso con error
+      window.location.reload();
       return { success: false, error: error.message };
     }
   };

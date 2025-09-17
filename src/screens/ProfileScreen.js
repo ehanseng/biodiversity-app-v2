@@ -21,32 +21,8 @@ const ProfileScreen = ({ navigation }) => {
         { text: 'Cancelar', style: 'cancel' },
         { 
           text: 'Cerrar Sesión', 
-          onPress: async () => {
-            try {
-              console.log('🚪 Usuario confirmó cierre de sesión');
-              console.log('🔍 Estado antes del signOut - user:', !!user, 'profile:', !!profile);
-              
-              // Mostrar loading inmediatamente
-              Alert.alert('Cerrando sesión...', 'Por favor espera');
-              
-              const result = await signOut();
-              console.log('📋 Resultado de signOut:', result);
-              
-              // El signOut ya maneja la recarga, pero por si acaso:
-              if (!result?.success) {
-                console.error('❌ Error al cerrar sesión:', result?.error);
-                Alert.alert('Error', 'Recargando página para forzar cierre de sesión...');
-                if (typeof window !== 'undefined') {
-                  window.location.reload();
-                }
-              }
-            } catch (error) {
-              console.error('❌ Error inesperado al cerrar sesión:', error);
-              Alert.alert('Error', 'Recargando página...');
-              if (typeof window !== 'undefined') {
-                window.location.reload();
-              }
-            }
+          onPress: () => {
+            signOut();
           }, 
           style: 'destructive' 
         },
