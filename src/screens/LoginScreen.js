@@ -18,18 +18,45 @@ const LoginScreen = ({ navigation }) => {
   const { signIn } = useAuth();
 
   const handleLogin = async () => {
+    console.log('🔐 Intentando login con:', { email, passwordLength: password.length });
+    
     if (!email || !password) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
     }
 
     setLoading(true);
-    const { error } = await signIn(email, password);
     
-    if (error) {
-      Alert.alert('Error de autenticación', error.message);
+    try {
+      const result = await signIn(email, password);
+      console.log('📊 Resultado del login:', result);
+      
+      if (result.error) {
+        console.error('❌ Error en login:', result.error);
+        
+        // Mostrar error más específico
+        let errorMessage = 'Error de autenticación';
+        if (result.error.includes('Invalid login credentials')) {
+          errorMessage = 'Email o contraseña incorrectos. Verifica tus datos.';
+        } else if (result.error.includes('Email not confirmed')) {
+          errorMessage = 'Debes confirmar tu email antes de iniciar sesión. Revisa tu bandeja de entrada.';
+        } else if (result.error.includes('Too many requests')) {
+          errorMessage = 'Demasiados intentos. Espera unos minutos antes de intentar de nuevo.';
+        } else {
+          errorMessage = result.error;
+        }
+        
+        Alert.alert('Error de autenticación', errorMessage);
+      } else {
+        console.log('✅ Login exitoso');
+        // El AuthContext se encarga de la navegación automática
+      }
+    } catch (error) {
+      console.error('❌ Error inesperado en login:', error);
+      Alert.alert('Error', 'Ocurrió un error inesperado. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

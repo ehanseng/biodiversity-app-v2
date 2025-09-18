@@ -27,37 +27,86 @@ const RegisterScreen = ({ navigation }) => {
     console.log('--- BOTÓN CREAR CUENTA PRESIONADO ---');
     const { email, password, confirmPassword, fullName, role } = formData;
 
+    console.log('📋 Datos del formulario:', { email, fullName, role, passwordLength: password.length });
+
     if (!email || !password || !fullName) {
+      console.log('❌ Campos faltantes');
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
     }
 
     if (password !== confirmPassword) {
+      console.log('❌ Contraseñas no coinciden');
       Alert.alert('Error', 'Las contraseñas no coinciden');
       return;
     }
 
     if (password.length < 6) {
+      console.log('❌ Contraseña muy corta');
       Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
+    console.log('✅ Validaciones pasadas, iniciando registro...');
     setLoading(true);
-    const { error } = await signUp(email, password, {
-      full_name: fullName,
-      role: role,
-    });
+    
+    try {
+      const result = await signUp(email, password, {
+        full_name: fullName,
+        role: role,
+      });
 
-    if (error) {
-      Alert.alert('Error de registro', error.message);
-    } else {
-      Alert.alert(
-        'Registro exitoso',
-        'Tu cuenta ha sido creada. Por favor verifica tu correo electrónico.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-      );
+      console.log('📊 Resultado del registro:', result);
+
+      if (result.success) {
+        console.log('✅ Registro exitoso');
+        
+        // Mostrar mensaje de éxito más claro
+        Alert.alert(
+          '🎉 ¡Cuenta Creada!',
+          'Tu cuenta ha sido creada exitosamente. ¡Ya puedes iniciar sesión!',
+          [
+            { 
+              text: 'Iniciar Sesión', 
+              onPress: () => {
+                // Limpiar formulario
+                setFormData({
+                  email: '',
+                  password: '',
+                  confirmPassword: '',
+                  fullName: '',
+                  role: 'explorer',
+                });
+                navigation.navigate('Login');
+              }
+            }
+          ]
+        );
+      } else {
+        console.error('❌ Error en registro:', result.error);
+        
+        // Mostrar error más específico
+        let errorMessage = 'Error desconocido';
+        if (result.error?.message) {
+          if (result.error.message.includes('already registered')) {
+            errorMessage = 'Este email ya está registrado. Intenta iniciar sesión.';
+          } else if (result.error.message.includes('Invalid email')) {
+            errorMessage = 'El formato del email no es válido.';
+          } else if (result.error.message.includes('Password')) {
+            errorMessage = 'La contraseña no cumple con los requisitos.';
+          } else {
+            errorMessage = result.error.message;
+          }
+        }
+        
+        Alert.alert('Error de registro', errorMessage);
+      }
+    } catch (error) {
+      console.error('❌ Error inesperado:', error);
+      Alert.alert('Error', 'Ocurrió un error inesperado. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const updateFormData = (field, value) => {

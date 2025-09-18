@@ -211,46 +211,91 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signIn = async (email, password) => {
+    console.log('🔐 Iniciando signIn con:', { email });
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      if (error) throw error;
-      return { success: true };
+      
+      console.log('📊 Resultado signIn:', { hasData: !!data, hasError: !!error, hasUser: !!data?.user });
+      
+      if (error) {
+        console.error('❌ Error en signIn:', error);
+        throw error;
+      }
+      
+      console.log('✅ SignIn exitoso');
+      return { success: true, data };
     } catch (error) {
+      console.error('❌ Error en signIn:', error);
       return { success: false, error: error.message };
     }
   };
 
-  const signUp = async (email, password, fullName, role = 'explorer') => {
+  const signUp = async (email, password, userData) => {
+    console.log('🔄 Iniciando signUp con:', { email, userData });
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: userData.full_name,
+            role: userData.role
+          },
+          emailRedirectTo: undefined // No redirect needed since no email confirmation
+        }
       });
 
-      if (error) throw error;
+      console.log('📊 Resultado signUp:', { hasData: !!data, hasError: !!error, userId: data?.user?.id });
 
-      if (data.user) {
-        // Create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              full_name: fullName,
-              role: role,
-              created_at: new Date().toISOString(),
-            },
-          ]);
-
-        if (profileError) throw profileError;
+      if (error) {
+        console.error('❌ Error en signUp:', error);
+        throw error;
       }
 
-      return { success: true };
+      if (data.user) {
+        console.log('👤 Usuario creado, verificando/creando perfil...');
+        
+        // Primero verificar si ya existe el perfil
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', data.user.id)
+          .single();
+
+        if (existingProfile) {
+          console.log('✅ Perfil ya existe, no es necesario crearlo');
+        } else {
+          console.log('🆕 Creando nuevo perfil...');
+          // Create profile
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: data.user.id,
+                email: email,
+                full_name: userData.full_name,
+                role: userData.role,
+                created_at: new Date().toISOString(),
+              },
+            ]);
+
+          if (profileError) {
+            console.error('❌ Error creando perfil:', profileError);
+            throw profileError;
+          }
+          
+          console.log('✅ Perfil creado exitosamente');
+        }
+      }
+
+      console.log('✅ SignUp completado exitosamente');
+      return { success: true, data };
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('❌ Error en signUp:', error);
+      return { success: false, error };
     }
   };
 
