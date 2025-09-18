@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Alert,
   Animated,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -309,7 +310,7 @@ ${tree.description || ''}`,
     Animated.spring(animation, {
       toValue,
       friction: 5,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
     setFabOpen(!fabOpen);
   };
@@ -366,23 +367,31 @@ ${tree.description || ''}`,
         }
       />
 
-      {/* Menú FAB Animado */}
+      {/* Menú FAB Animado Definitivo */}
       <View style={styles.fabContainer}>
-        <TouchableOpacity onPress={() => navigation.navigate('AddAnimal')}>
-          <Animated.View style={[styles.fab, styles.secondaryFab, { transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) }] }]}>
-            <Ionicons name="paw" size={24} color="#ffffff" />
-          </Animated.View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('AddTree')}>
-          <Animated.View style={[styles.fab, styles.secondaryFab, { transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -120] }) }] }]}>
-            <Ionicons name="leaf" size={24} color="#ffffff" />
-          </Animated.View>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={toggleFabMenu}>
+        {/* Botón principal (se renderiza primero) */}
+        <TouchableOpacity onPress={toggleFabMenu} style={styles.fabMain}>
           <Animated.View style={[styles.fab, { transform: [{ rotate: animation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }] }]}>
             <Ionicons name="add" size={24} color="#ffffff" />
           </Animated.View>
         </TouchableOpacity>
+
+        {/* Botones secundarios (se renderizan encima) */}
+        <Animated.View style={[styles.secondaryFab, { zIndex: 10, transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -120] }) }] }]}>
+          <TouchableOpacity onPress={() => navigation.navigate('AddTree')}>
+            <View style={styles.fab}>
+              <Ionicons name="leaf" size={24} color="#ffffff" />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+
+        <Animated.View style={[styles.secondaryFab, { zIndex: 10, transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) }] }]}>
+          <TouchableOpacity onPress={() => navigation.navigate('AddAnimal')}>
+            <View style={styles.fab}>
+              <Ionicons name="paw" size={24} color="#ffffff" />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </View>
   );
@@ -545,29 +554,26 @@ const styles = StyleSheet.create({
   },
   fabContainer: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: 20,
+    right: 20,
+    alignItems: 'center',
   },
   fab: {
-    backgroundColor: '#2d5016',
     width: 56,
     height: 56,
     borderRadius: 28,
+    backgroundColor: '#2d5016',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    elevation: 8,
   },
   secondaryFab: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: 0,
+    right: 0,
+  },
+  fabMain: {
+    zIndex: 20, // Asegurar que el botón principal esté encima
   },
 });
 
