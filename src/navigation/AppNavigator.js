@@ -48,7 +48,7 @@ const MainTabs = () => {
           } else if (route.name === 'Map') {
             iconName = focused ? 'map' : 'map-outline';
           } else if (route.name === 'Explorer') {
-            iconName = focused ? 'leaf' : 'leaf-outline';
+            iconName = focused ? 'albums' : 'albums-outline';
           } else if (route.name === 'Scientist') {
             iconName = focused ? 'flask' : 'flask-outline';
           } else if (route.name === 'Admin') {
@@ -56,9 +56,9 @@ const MainTabs = () => {
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else if (route.name === 'Add Tree') {
-            iconName = focused ? 'add-circle' : 'add-circle-outline';
+            iconName = focused ? 'leaf' : 'leaf-outline';
           } else if (route.name === 'Add Animal') {
-            iconName = focused ? 'add-circle' : 'add-circle-outline';
+            iconName = focused ? 'paw' : 'paw-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;

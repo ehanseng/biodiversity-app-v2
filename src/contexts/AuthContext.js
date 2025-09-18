@@ -21,61 +21,31 @@ export const AuthProvider = ({ children }) => {
   const [syncStats, setSyncStats] = useState({ total: 0, pending: 0, synced: 0, errors: 0 });
 
   useEffect(() => {
-    console.log('🔐 AuthProvider montado. Verificando sesión...');
-    let isMounted = true;
-
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (isMounted) {
-          if (session?.user) {
-            console.log('✅ Sesión activa encontrada. Cargando datos...');
-            setUser(session.user);
-            await fetchProfile(session.user.id);
-            performAutoSync(session.user.id).catch(console.warn);
-          } else {
-            console.log('❌ No hay sesión activa.');
-            setLoading(false);
-          }
-        }
-      } catch (e) {
-        console.error('🚨 Error crítico verificando sesión:', e);
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!isMounted) return;
-      
-      console.log(`🔔 Evento de Auth recibido: ${_event}`);
-      
-      // Si hay un usuario en la sesión, cargar sus datos
-      if (session?.user) {
-        // Evitar recargar si el usuario ya es el mismo
-        if (user?.id !== session.user.id) {
-          console.log('✨ Nuevo usuario detectado. Cargando datos...');
-          setUser(session.user);
-          await fetchProfile(session.user.id);
-          performAutoSync(session.user.id).catch(console.warn);
-        }
-      } 
-      // Si NO hay sesión, limpiar todo
-      else {
-        console.log('🧹 No hay sesión, limpiando estado.');
-        setUser(null);
-        setProfile(null);
+    // 1. Revisar la sesión UNA VEZ al cargar
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setUser(session.user);
+        fetchProfile(session.user.id);
+        performAutoSync(session.user.id).catch(console.warn);
+      } else {
         setLoading(false);
       }
     });
 
-    return () => {
-      console.log('🧹 AuthProvider desmontado. Limpiando suscripción.');
-      isMounted = false;
-      subscription.unsubscribe();
-    };
+    // 2. Escuchar cambios de sesión (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'SIGNED_IN') {
+        setUser(session.user);
+        fetchProfile(session.user.id);
+        performAutoSync(session.user.id).catch(console.warn);
+      }
+      if (_event === 'SIGNED_OUT') {
+        setUser(null);
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const fetchProfile = async (userId) => {

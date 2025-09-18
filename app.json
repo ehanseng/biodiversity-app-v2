@@ -1,11 +1,14 @@
 {
   "expo": {
-    "name": "Biodiversity App",
+    "name": "Explora Tadeo",
     "slug": "biodiversity-app-v2",
     "version": "1.0.0",
     "orientation": "portrait",
+    "description": "Una plataforma para el registro y monitoreo de la biodiversidad en el campus de la Universidad Tadeo Lozano.",
     "userInterfaceStyle": "light",
-    "platforms": ["web"],
+    "platforms": [
+      "web"
+    ],
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#2d5016"
@@ -13,6 +16,11 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
+    },
+    "extra": {
+      "social": {
+        "imageUrl": "./assets/og-image.png"
+      }
     }
   }
 }

@@ -13,11 +13,8 @@ const ProfileScreen = ({ navigation }) => {
   const { user, profile, signOut, refreshProfile } = useAuth();
 
   const handleLogout = () => {
-    console.log('--- BOTÓN CERRAR SESIÓN PRESIONADO ---');
-
     // Usar confirmación nativa del navegador para máxima compatibilidad
     if (window.confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-      console.log(' Confirmado. Llamando a signOut...');
       signOut();
     }
   };
