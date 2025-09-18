@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +25,8 @@ const HomeScreen = ({ navigation }) => {
     localTrees: 0,
   });
   const [syncing, setSyncing] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+  const animation = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
     loadTreeStats();
@@ -162,171 +165,172 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const toggleFabMenu = () => {
+    const toValue = fabOpen ? 0 : 1;
+    Animated.spring(animation, {
+      toValue,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+    setFabOpen(!fabOpen);
+  };
+
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.greeting}>
-          ¡Hola, {profile?.full_name || user?.email?.split('@')[0] || 'Usuario'}!
-        </Text>
-        <Text style={styles.subtitle}>
-          {profile?.full_name ? profile.full_name : (user?.email || 'Usuario sin email')}
-        </Text>
-        {profile?.role && (
-          <Text style={styles.roleText}>
-            {profile.role === 'explorer' ? '🌱 Explorador' : 
-             profile.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
+    <View style={{ flex: 1 }}>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.greeting}>
+            ¡Hola, {profile?.full_name || user?.email?.split('@')[0] || 'Usuario'}!
           </Text>
-        )}
-      </View>
-
-      {/* Indicador de Sincronización */}
-      {treeStats.localTrees > 0 && (
-        <View style={styles.syncIndicator}>
-          <View style={styles.syncInfo}>
-            <Ionicons 
-              name={syncing ? "sync" : "cloud-upload-outline"} 
-              size={20} 
-              color="#ffc107" 
-              style={syncing ? styles.spinning : null}
-            />
-            <Text style={styles.syncText}>
-              {syncing 
-                ? 'Sincronizando...' 
-                : `${treeStats.localTrees} árboles pendientes de sincronizar`
-              }
+          <Text style={styles.subtitle}>
+            {profile?.full_name ? profile.full_name : (user?.email || 'Usuario sin email')}
+          </Text>
+          {profile?.role && (
+            <Text style={styles.roleText}>
+              {profile.role === 'explorer' ? '🌱 Explorador' : 
+               profile.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
             </Text>
-          </View>
-          <TouchableOpacity 
-            style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
-            onPress={handleManualSync}
-            disabled={syncing}
-          >
-            <Ionicons 
-              name={syncing ? "sync" : "cloud-download-outline"} 
-              size={20} 
-              color={syncing ? "#6c757d" : "#ffffff"} 
-            />
-            <Text style={[styles.syncButtonText, syncing && styles.syncButtonTextDisabled]}>
-              {syncing ? 'Sincronizando...' : 'Sincronizar Árboles'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Estadísticas */}
-      <View style={styles.statsContainer}>
-        <Text style={styles.sectionTitle}>📊 Estadísticas</Text>
-        
-        <View style={styles.statsGrid}>
-          <TouchableOpacity 
-            style={[styles.statCard, { borderLeftColor: '#28a745' }]}
-            onPress={() => navigation.navigate('Explorer', { initialFilter: 'all' })}
-          >
-            <Text style={styles.statNumber}>{treeStats.totalTrees}</Text>
-            <Text style={styles.statLabel}>Aprobados (Todos)</Text>
-          </TouchableOpacity>
-          
-          {/* Mostrar estadísticas de "mis árboles" para exploradores, científicos y admins */}
-          {(profile?.role === 'explorer' || profile?.role === 'scientist' || profile?.role === 'admin') && (
-            <>
-              <TouchableOpacity 
-                style={[styles.statCard, { borderLeftColor: '#007bff' }]}
-                onPress={() => navigation.navigate('Explorer', { initialFilter: 'mine' })}
-              >
-                <Text style={styles.statNumber}>{treeStats.myTrees}</Text>
-                <Text style={styles.statLabel}>Mis Árboles</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.statCard, { borderLeftColor: '#28a745' }]}
-                onPress={() => navigation.navigate('Explorer', { initialFilter: 'approved' })}
-              >
-                <Text style={styles.statNumber}>{treeStats.approvedTrees}</Text>
-                <Text style={styles.statLabel}>Mis Aprobados</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.statCard, { borderLeftColor: '#ffc107' }]}
-                onPress={() => navigation.navigate('Explorer', { initialFilter: 'pending' })}
-              >
-                <Text style={styles.statNumber}>{treeStats.pendingTrees}</Text>
-                <Text style={styles.statLabel}>Mis Pendientes</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.statCard, { borderLeftColor: '#dc3545' }]}
-                onPress={() => navigation.navigate('Explorer', { initialFilter: 'rejected' })}
-              >
-                <Text style={styles.statNumber}>{treeStats.rejectedTrees}</Text>
-                <Text style={styles.statLabel}>Mis Rechazados</Text>
-              </TouchableOpacity>
-              
-              {treeStats.localTrees > 0 && (
-                <TouchableOpacity 
-                  style={[styles.statCard, { borderLeftColor: '#6f42c1' }]}
-                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'local' })}
-                >
-                  <Text style={styles.statNumber}>{treeStats.localTrees}</Text>
-                  <Text style={styles.statLabel}>Locales</Text>
-                </TouchableOpacity>
-              )}
-            </>
           )}
         </View>
-      </View>
 
-      {/* Acciones Rápidas */}
-      <View style={styles.actionsContainer}>
-        <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
-        
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('AddTree')}
-        >
-          <Ionicons name="add-circle" size={24} color="#ffffff" />
-          <Text style={styles.actionButtonText}>Agregar Árbol</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.secondaryButton]}
-          onPress={() => navigation.navigate('Explorer')}
-        >
-          <Ionicons name="list" size={24} color="#2d5016" />
-          <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
-            Ver Todos los Árboles
-          </Text>
-        </TouchableOpacity>
+        {/* Indicador de Sincronización */}
+        {treeStats.localTrees > 0 && (
+          <View style={styles.syncIndicator}>
+            <View style={styles.syncInfo}>
+              <Ionicons 
+                name={syncing ? "sync" : "cloud-upload-outline"} 
+                size={20} 
+                color="#ffc107" 
+                style={syncing ? styles.spinning : null}
+              />
+              <Text style={styles.syncText}>
+                {syncing 
+                  ? 'Sincronizando...' 
+                  : `${treeStats.localTrees} árboles pendientes de sincronizar`
+                }
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
+              onPress={handleManualSync}
+              disabled={syncing}
+            >
+              <Ionicons 
+                name={syncing ? "sync" : "cloud-download-outline"} 
+                size={20} 
+                color={syncing ? "#6c757d" : "#ffffff"} 
+              />
+              <Text style={[styles.syncButtonText, syncing && styles.syncButtonTextDisabled]}>
+                {syncing ? 'Sincronizando...' : 'Sincronizar Árboles'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.secondaryButton]}
-          onPress={() => navigation.navigate('Map')}
-        >
-          <Ionicons name="map" size={24} color="#2d5016" />
-          <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
-            Ver en Mapa
-          </Text>
-        </TouchableOpacity>
+        {/* Estadísticas */}
+        <View style={styles.statsContainer}>
+          <Text style={styles.sectionTitle}>📊 Estadísticas</Text>
+          
+          <View style={styles.statsGrid}>
+            <TouchableOpacity 
+              style={[styles.statCard, { borderLeftColor: '#28a745' }]}
+              onPress={() => navigation.navigate('Explorer', { initialFilter: 'all' })}
+            >
+              <Text style={styles.statNumber}>{treeStats.totalTrees}</Text>
+              <Text style={styles.statLabel}>Aprobados (Todos)</Text>
+            </TouchableOpacity>
+            
+            {/* Mostrar estadísticas de "mis árboles" para exploradores, científicos y admins */}
+            {(profile?.role === 'explorer' || profile?.role === 'scientist' || profile?.role === 'admin') && (
+              <>
+                <TouchableOpacity 
+                  style={[styles.statCard, { borderLeftColor: '#007bff' }]}
+                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'mine' })}
+                >
+                  <Text style={styles.statNumber}>{treeStats.myTrees}</Text>
+                  <Text style={styles.statLabel}>Mis Árboles</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.statCard, { borderLeftColor: '#28a745' }]}
+                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'approved' })}
+                >
+                  <Text style={styles.statNumber}>{treeStats.approvedTrees}</Text>
+                  <Text style={styles.statLabel}>Mis Aprobados</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.statCard, { borderLeftColor: '#ffc107' }]}
+                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'pending' })}
+                >
+                  <Text style={styles.statNumber}>{treeStats.pendingTrees}</Text>
+                  <Text style={styles.statLabel}>Mis Pendientes</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.statCard, { borderLeftColor: '#dc3545' }]}
+                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'rejected' })}
+                >
+                  <Text style={styles.statNumber}>{treeStats.rejectedTrees}</Text>
+                  <Text style={styles.statLabel}>Mis Rechazados</Text>
+                </TouchableOpacity>
+                
+                {treeStats.localTrees > 0 && (
+                  <TouchableOpacity 
+                    style={[styles.statCard, { borderLeftColor: '#6f42c1' }]}
+                    onPress={() => navigation.navigate('Explorer', { initialFilter: 'local' })}
+                  >
+                    <Text style={styles.statNumber}>{treeStats.localTrees}</Text>
+                    <Text style={styles.statLabel}>Locales</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+        </View>
 
         {/* Botón especial para científicos y admins */}
         {(profile?.role === 'scientist' || profile?.role === 'admin') && (
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.scientistButton]}
-            onPress={() => navigation.navigate('ScientistApproval')}
-          >
-            <Ionicons name="checkmark-done-circle" size={24} color="#ffffff" />
-            <Text style={styles.actionButtonText}>
-              🔬 Revisión Científica
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.actionsContainer}>
+            <Text style={styles.sectionTitle}>Panel de Revisión</Text>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.scientistButton]}
+              onPress={() => navigation.navigate('ScientistApproval')}
+            >
+              <Ionicons name="checkmark-done-circle" size={24} color="#ffffff" />
+              <Text style={styles.actionButtonText}>
+                🔬 Revisión Científica
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
+      </ScrollView>
+
+      {/* Menú FAB Animado */}
+      <View style={styles.fabContainer}>
+        <TouchableOpacity onPress={() => navigation.navigate('AddAnimal')}>
+          <Animated.View style={[styles.fab, styles.secondaryFab, { transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) }] }]}>
+            <Ionicons name="paw" size={24} color="#ffffff" />
+          </Animated.View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('AddTree')}>
+          <Animated.View style={[styles.fab, styles.secondaryFab, { transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -120] }) }] }]}>
+            <Ionicons name="leaf" size={24} color="#ffffff" />
+          </Animated.View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={toggleFabMenu}>
+          <Animated.View style={[styles.fab, { transform: [{ rotate: animation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }] }]}>
+            <Ionicons name="add" size={24} color="#ffffff" />
+          </Animated.View>
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+    </View>
   );
 };
 
@@ -471,6 +475,31 @@ const styles = StyleSheet.create({
     color: '#2d5016',
   },
   scientistButton: {
+    backgroundColor: '#007bff',
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+  },
+  fab: {
+    backgroundColor: '#2d5016',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+  },
+  secondaryFab: {
     backgroundColor: '#007bff',
   },
 });

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform, Image, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import TreeStorageService from '../services/TreeStorageService';
@@ -23,9 +24,11 @@ const AddTreeScreen = ({ navigation }) => {
     height_meters: '',
     diameter_cm: '',
     health_status: '',
+    image_url: null,
   });
   const [loading, setLoading] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [image, setImage] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -90,7 +93,9 @@ const AddTreeScreen = ({ navigation }) => {
       height_meters: '',
       diameter_cm: '',
       health_status: '',
+      image_url: null,
     });
+    setImage(null);
     setShowMap(false);
     console.log('✅ [AddTreeScreen] Formulario limpiado para nuevo árbol');
   };
@@ -242,6 +247,103 @@ const AddTreeScreen = ({ navigation }) => {
     }
   };
 
+  const pickImage = async () => {
+    // En la web, el navegador maneja la elección entre cámara y galería
+    if (Platform.OS === 'web') {
+      pickFromGallery();
+      return;
+    }
+
+    // En móvil, dar la opción al usuario
+    Alert.alert(
+      'Seleccionar Imagen',
+      '¿Desde dónde quieres obtener la foto?',
+      [
+        {
+          text: 'Cámara',
+          onPress: () => takePhoto(),
+        },
+        {
+          text: 'Galería',
+          onPress: () => pickFromGallery(),
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'Necesitamos acceso a tu cámara para tomar una foto.');
+      return;
+    }
+
+    let result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'Necesitamos acceso a tu galería para seleccionar una foto.');
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  const uploadImage = async (uri) => {
+    try {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const fileExt = uri.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      showNotification('Subiendo imagen...', '', 'info');
+
+      let { error: uploadError } = await supabase.storage
+        .from('trees-images') // Nombre de tu bucket en Supabase Storage
+        .upload(filePath, blob, {
+          contentType: `image/${fileExt}`,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Obtener la URL pública
+      const { data } = supabase.storage.from('trees-images').getPublicUrl(filePath);
+      console.log('✅ Imagen subida, URL pública:', data.publicUrl);
+      return data.publicUrl;
+
+    } catch (error) {
+      console.error('❌ Error al subir la imagen:', error);
+      showError('Error al subir la imagen');
+      return null;
+    }
+  };
+
   const handleSubmit = async () => {
     console.log('🚀 [AddTreeScreen] Iniciando handleSubmit...');
     console.log('🚀 [AddTreeScreen] FormData:', formData);
@@ -260,6 +362,16 @@ const AddTreeScreen = ({ navigation }) => {
     console.log('🚀 [AddTreeScreen] Iniciando guardado...');
     
     try {
+      let imageUrl = null;
+      // Si hay una imagen seleccionada, subirla primero
+      if (image) {
+        imageUrl = await uploadImage(image);
+        if (!imageUrl) {
+          setLoading(false);
+          return; // Detener si la subida de imagen falla
+        }
+      }
+
       const treeData = {
         user_id: user.id,
         common_name: formData.common_name.trim(),
@@ -271,6 +383,7 @@ const AddTreeScreen = ({ navigation }) => {
         height: formData.height_meters ? parseFloat(formData.height_meters) : null,
         diameter: formData.diameter_cm ? parseFloat(formData.diameter_cm) : null,
         health_status: formData.health_status.trim() || null,
+        image_url: imageUrl,
       };
 
       console.log('🚀 [AddTreeScreen] TreeData preparado:', treeData);
@@ -404,6 +517,7 @@ const AddTreeScreen = ({ navigation }) => {
     <ScrollView 
       ref={scrollViewRef}
       style={styles.container}
+      contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
@@ -503,6 +617,22 @@ const AddTreeScreen = ({ navigation }) => {
           />
         </View>
 
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Foto del Árbol</Text>
+          <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+            <Ionicons name="camera" size={20} color="#2d5016" />
+            <Text style={styles.imagePickerButtonText}>Seleccionar Foto</Text>
+          </TouchableOpacity>
+          {image && (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: image }} style={styles.imagePreview} />
+              <TouchableOpacity style={styles.removeImageButton} onPress={() => setImage(null)}>
+                <Ionicons name="close-circle" size={24} color="#dc3545" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         <View style={styles.row}>
           <View style={[styles.inputGroup, styles.halfWidth]}>
             <Text style={styles.label}>Altura (metros)</Text>
@@ -580,8 +710,11 @@ const AddTreeScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    height: '100vh', // <-- ¡EL CAMBIO CLAVE!
     backgroundColor: '#f8f9fa',
+  },
+  contentContainer: {
+    paddingBottom: 100, // Añadir espacio al final para el scroll
   },
   header: {
     backgroundColor: '#2d5016',
@@ -663,6 +796,41 @@ const styles = StyleSheet.create({
   debugText: {
     fontSize: 14,
     color: '#666',
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e9ecef',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  imagePickerButtonText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#2d5016',
+    fontWeight: '600',
+  },
+  imagePreviewContainer: {
+    marginTop: 15,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#fff',
+    borderRadius: 12,
   },
 });
 

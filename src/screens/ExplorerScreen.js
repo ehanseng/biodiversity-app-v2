@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,6 +20,8 @@ const ExplorerScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState(route?.params?.initialFilter || 'all'); // all, mine, approved, pending, local, rejected
+  const [fabOpen, setFabOpen] = useState(false);
+  const animation = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
     loadTrees();
@@ -301,6 +304,16 @@ ${tree.description || ''}`,
     tree.approval_status === 'approved'
   ).length;
 
+  const toggleFabMenu = () => {
+    const toValue = fabOpen ? 0 : 1;
+    Animated.spring(animation, {
+      toValue,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+    setFabOpen(!fabOpen);
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -353,13 +366,24 @@ ${tree.description || ''}`,
         }
       />
 
-      {/* FAB para agregar árbol */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('AddTree')}
-      >
-        <Ionicons name="add" size={24} color="#ffffff" />
-      </TouchableOpacity>
+      {/* Menú FAB Animado */}
+      <View style={styles.fabContainer}>
+        <TouchableOpacity onPress={() => navigation.navigate('AddAnimal')}>
+          <Animated.View style={[styles.fab, styles.secondaryFab, { transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) }] }]}>
+            <Ionicons name="paw" size={24} color="#ffffff" />
+          </Animated.View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('AddTree')}>
+          <Animated.View style={[styles.fab, styles.secondaryFab, { transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -120] }) }] }]}>
+            <Ionicons name="leaf" size={24} color="#ffffff" />
+          </Animated.View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={toggleFabMenu}>
+          <Animated.View style={[styles.fab, { transform: [{ rotate: animation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }] }]}>
+            <Ionicons name="add" size={24} color="#ffffff" />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -519,24 +543,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  fab: {
+  fabContainer: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
+    bottom: 16,
+    right: 16,
+  },
+  fab: {
+    backgroundColor: '#2d5016',
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#2d5016',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  secondaryFab: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
   },
 });
 

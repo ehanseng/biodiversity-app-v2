@@ -4,6 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingScreen from '../components/LoadingScreen';
+import { useNavigation } from '@react-navigation/native';
+import { View, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -40,6 +42,7 @@ const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
+        headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
@@ -52,13 +55,9 @@ const MainTabs = () => {
           } else if (route.name === 'Scientist') {
             iconName = focused ? 'flask' : 'flask-outline';
           } else if (route.name === 'Admin') {
-            iconName = focused ? 'settings' : 'settings-outline';
+            iconName = focused ? 'build' : 'build-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'Add Tree') {
-            iconName = focused ? 'leaf' : 'leaf-outline';
-          } else if (route.name === 'Add Animal') {
-            iconName = focused ? 'paw' : 'paw-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -68,31 +67,22 @@ const MainTabs = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Explorer" component={ExplorerScreen} />
+      
+      {profile?.role === 'scientist' && <Tab.Screen name="Scientist" component={ScientistScreen} />}
+      {profile?.role === 'admin' && <Tab.Screen name="Admin" component={AdminScreen} />}
+
       <Tab.Screen name="Map" component={MapScreen} />
-      
-      {(profile?.role === 'explorer' || profile?.role === 'scientist' || profile?.role === 'admin') && (
-        <Tab.Screen name="Explorer" component={ExplorerScreen} />
-      )}
-      
-      {profile?.role === 'scientist' && (
-        <Tab.Screen name="Scientist" component={ScientistScreen} />
-      )}
-      
-      {profile?.role === 'admin' && (
-        <Tab.Screen name="Admin" component={AdminScreen} />
-      )}
-      
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Add Tree" component={AddTreeScreen} />
-      <Tab.Screen name="Add Animal" component={AddAnimalScreen} />
     </Tab.Navigator>
   );
 };
 
-// Stack Navigator principal que incluye las tabs y pantallas adicionales
 const MainStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="MainTabs" component={MainTabs} />
+    <Stack.Screen name="AddTree" component={AddTreeScreen} />
+    <Stack.Screen name="AddAnimal" component={AddAnimalScreen} />
     <Stack.Screen name="ScientistApproval" component={ScientistApprovalScreen} />
   </Stack.Navigator>
 );
