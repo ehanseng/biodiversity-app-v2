@@ -17,6 +17,7 @@ config.resolver = {
     'react-native': 'react-native-web',
   },
   platforms: ['web', 'native', 'ios', 'android'],
+  assetExts: [...config.resolver.assetExts, 'ttf', 'otf', 'woff', 'woff2'],
 };
 
 module.exports = config;
