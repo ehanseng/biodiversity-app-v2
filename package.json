@@ -7,9 +7,13 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web",
-    "build:web": "expo export --platform web",
-    "preview": "npx serve dist -s"
+    "build": "expo export --platform web --output-dir dist",
+    "build:web": "expo export --platform web --output-dir dist",
+    "build:prod": "cross-env EXPO_PUBLIC_ENVIRONMENT=production expo export --platform web --output-dir dist",
+    "build:prod:win": "set EXPO_PUBLIC_ENVIRONMENT=production && expo export --platform web --output-dir dist",
+    "build:simple": "expo export --platform web --output-dir dist --clear",
+    "preview": "npx serve dist -s",
+    "serve": "npx serve dist -s -p 3000"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -31,6 +35,10 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1",
+    "cross-env": "^7.0.3"
   },
   "private": true
 }

@@ -21,6 +21,9 @@
       "social": {
         "imageUrl": "./assets/og-image.png"
       }
+    },
+    "experiments": {
+      "typedRoutes": false
     }
   }
 }

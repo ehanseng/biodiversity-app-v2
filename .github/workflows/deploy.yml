@@ -1,0 +1,75 @@
+name: 🚀 Deploy to GoDaddy
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📂 Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: 🟢 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🔧 Setup environment variables
+      run: |
+        echo "EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" >> $GITHUB_ENV
+        echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}" >> $GITHUB_ENV
+        echo "EXPO_PUBLIC_ENVIRONMENT=production" >> $GITHUB_ENV
+        
+    - name: 🏗️ Build application
+      run: npm run build:prod
+      
+    - name: 📋 List build contents
+      run: |
+        echo "Build directory contents:"
+        ls -la dist/
+        
+    - name: 📦 Create deployment package
+      run: |
+        cd dist
+        zip -r ../deployment.zip .
+        cd ..
+        echo "Deployment package size: $(du -h deployment.zip | cut -f1)"
+        
+    - name: 🚀 Deploy to GoDaddy via FTP
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./dist/
+        server-dir: /public_html/
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          **/.env
+          
+    - name: 🧹 Cleanup
+      run: |
+        rm -f deployment.zip
+        
+    - name: ✅ Deployment Success
+      if: success()
+      run: |
+        echo "🎉 Deployment completed successfully!"
+        echo "🌐 Your app should be available at: https://explora.ieeetadeo.org"
+        
+    - name: ❌ Deployment Failed
+      if: failure()
+      run: |
+        echo "💥 Deployment failed. Please check the logs above."

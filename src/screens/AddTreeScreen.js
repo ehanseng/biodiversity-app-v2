@@ -10,6 +10,7 @@ import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
 import webNotifications from '../utils/WebNotifications';
+import DynamicMapView from '../components/DynamicMapView';
 
 const AddTreeScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -31,8 +32,6 @@ const AddTreeScreen = ({ navigation }) => {
   const [image, setImage] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markerRef = useRef(null);
   const scrollViewRef = useRef(null);
 
   // Función helper para mostrar notificaciones tanto en app como en navegador
@@ -57,23 +56,6 @@ const AddTreeScreen = ({ navigation }) => {
       }
     }
   };
-
-  useEffect(() => {
-    if (Platform.OS === 'web' && showMap && formData.latitude && formData.longitude) {
-      setTimeout(() => loadMap(), 100); // Pequeño delay para asegurar que el div esté renderizado
-    }
-  }, [showMap]);
-
-  useEffect(() => {
-    if (mapInstanceRef.current && markerRef.current && formData.latitude && formData.longitude) {
-      const lat = parseFloat(formData.latitude);
-      const lng = parseFloat(formData.longitude);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        markerRef.current.setLatLng([lat, lng]);
-        mapInstanceRef.current.setView([lat, lng], 16);
-      }
-    }
-  }, [formData.latitude, formData.longitude]);
 
   const updateFormData = (field, value) => {
     setFormData(prev => ({
@@ -104,74 +86,6 @@ const AddTreeScreen = ({ navigation }) => {
     console.log('🚀 [AddTreeScreen] Navegando a Explorer...');
     eventEmitter.emit(EVENTS.DATA_REFRESH_NEEDED);
     navigation.navigate('Explorer');
-  };
-
-  const loadMap = () => {
-    if (typeof window === 'undefined') return;
-    
-    if (!window.L) {
-      // Cargar Leaflet si no está disponible
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload = () => setTimeout(initializeMap, 100);
-      document.head.appendChild(script);
-    } else {
-      setTimeout(initializeMap, 100);
-    }
-  };
-
-  const initializeMap = () => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-
-    try {
-      const lat = parseFloat(formData.latitude) || 9.928069;
-      const lng = parseFloat(formData.longitude) || -84.090725;
-
-      // Crear mapa
-      const map = window.L.map(mapRef.current, {
-        center: [lat, lng],
-        zoom: 16,
-        zoomControl: true,
-      });
-
-      // Agregar tiles
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: ' OpenStreetMap contributors',
-        maxZoom: 19,
-      }).addTo(map);
-
-      // Crear marcador movible
-      const marker = window.L.marker([lat, lng], {
-        draggable: true,
-        title: 'Arrastra para ajustar ubicación'
-      }).addTo(map);
-
-      // Evento cuando se mueve el marcador
-      marker.on('dragend', function(e) {
-        const pos = e.target.getLatLng();
-        updateFormData('latitude', pos.lat.toFixed(6));
-        updateFormData('longitude', pos.lng.toFixed(6));
-      });
-
-      // Click en mapa para mover marcador
-      map.on('click', function(e) {
-        marker.setLatLng(e.latlng);
-        updateFormData('latitude', e.latlng.lat.toFixed(6));
-        updateFormData('longitude', e.latlng.lng.toFixed(6));
-      });
-
-      mapInstanceRef.current = map;
-      markerRef.current = marker;
-      
-      console.log(' Mapa interactivo inicializado');
-    } catch (error) {
-      console.error(' Error inicializando mapa:', error);
-    }
   };
 
   const getCurrentLocation = async () => {
@@ -600,9 +514,29 @@ const AddTreeScreen = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
 
-        {showMap && (
+        {showMap && formData.latitude && formData.longitude && (
           <View style={styles.mapContainer}>
-            <div ref={mapRef} style={{ width: '100%', height: 300 }} />
+            <DynamicMapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={{
+                latitude: parseFloat(formData.latitude),
+                longitude: parseFloat(formData.longitude),
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              markerCoordinate={{
+                latitude: parseFloat(formData.latitude),
+                longitude: parseFloat(formData.longitude),
+              }}
+              markerTitle="Ubicación del Árbol"
+              markerDescription="Arrastra el mapa para ajustar"
+              onMarkerDragEnd={(e) => {
+                const { latitude, longitude } = e.nativeEvent.coordinate;
+                updateFormData('latitude', latitude.toFixed(6));
+                updateFormData('longitude', longitude.toFixed(6));
+              }}
+            />
           </View>
         )}
 
@@ -710,11 +644,11 @@ const AddTreeScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
-    height: '100vh', // <-- ¡EL CAMBIO CLAVE!
+    height: '100vh', 
     backgroundColor: '#f8f9fa',
   },
   contentContainer: {
-    paddingBottom: 100, // Añadir espacio al final para el scroll
+    paddingBottom: 100, 
   },
   header: {
     backgroundColor: '#2d5016',
@@ -783,7 +717,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   mapContainer: {
+    height: 300,
     marginBottom: 20,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
   },
   debugInfo: {
     padding: 10,

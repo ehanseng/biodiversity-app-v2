@@ -24,6 +24,7 @@ const RegisterScreen = ({ navigation }) => {
   const { signUp } = useAuth();
 
   const handleRegister = async () => {
+    console.log('--- BOTÓN CREAR CUENTA PRESIONADO ---');
     const { email, password, confirmPassword, fullName, role } = formData;
 
     if (!email || !password || !fullName) {
