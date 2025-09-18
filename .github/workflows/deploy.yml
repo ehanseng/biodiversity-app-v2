@@ -36,13 +36,7 @@ jobs:
       run: |
         echo "Build directory contents:"
         ls -la dist/
-        
-    - name: 📦 Create deployment package
-      run: |
-        cd dist
-        zip -r ../deployment.zip .
-        cd ..
-        echo "Deployment package size: $(du -h deployment.zip | cut -f1)"
+        echo "Build size: $(du -sh dist/ | cut -f1)"
         
     - name: 🚀 Deploy to GoDaddy via FTP
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -51,25 +45,28 @@ jobs:
         server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
+        protocol: ftp
+        port: 21
         local-dir: ./dist/
-        server-dir: /public_html/
+        server-dir: ./public_html/
         exclude: |
           **/.git*
           **/.git*/**
           **/node_modules/**
-          **/.env
+          **/.DS_Store
+          **/.env*
+          **/Thumbs.db
           
-    - name: 🧹 Cleanup
-      run: |
-        rm -f deployment.zip
-        
     - name: ✅ Deployment Success
       if: success()
       run: |
         echo "🎉 Deployment completed successfully!"
         echo "🌐 Your app should be available at: https://explora.ieeetadeo.org"
+        echo "📊 Build size: $(du -sh dist/ | cut -f1)"
         
     - name: ❌ Deployment Failed
       if: failure()
       run: |
         echo "💥 Deployment failed. Please check the logs above."
+        echo "Server IP: 72.167.151.233"
+        echo "Make sure FTP credentials are correct in GitHub Secrets"
