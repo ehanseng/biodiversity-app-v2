@@ -22,6 +22,12 @@ Esta aplicación se despliega automáticamente a [explora.ieeetadeo.org](https:/
 - Sistema de autenticación
 - Panel de administración
 
+## 🌐 Estado del Despliegue
+
+✅ Configuración FTP completada
+✅ GitHub Actions funcionando
+🔄 Ajustando ruta de despliegue a `/public_html/explora/`
+
 ---
 
-*Última actualización: $(date)*
+*Última actualización: 2025-01-17 22:03*
