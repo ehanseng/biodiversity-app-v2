@@ -32,11 +32,28 @@ jobs:
     - name: 🏗️ Build application
       run: npm run build:prod
       
-    - name: 📋 List build contents
+    - name: 📋 List build contents (detailed)
       run: |
-        echo "Build directory contents:"
+        echo "=== Build directory contents ==="
         ls -la dist/
-        echo "Build size: $(du -sh dist/ | cut -f1)"
+        echo ""
+        echo "=== All files recursively ==="
+        find dist/ -type f -exec ls -la {} \;
+        echo ""
+        echo "=== File count ==="
+        find dist/ -type f | wc -l
+        echo ""
+        echo "=== Build size ==="
+        du -sh dist/
+        echo ""
+        echo "=== Critical files check ==="
+        if [ -f "dist/index.html" ]; then
+          echo "✅ index.html exists ($(stat -c%s dist/index.html) bytes)"
+          echo "--- index.html content preview ---"
+          head -20 dist/index.html
+        else
+          echo "❌ index.html missing!"
+        fi
         
     - name: 🚀 Deploy to GoDaddy via FTP
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -49,6 +66,7 @@ jobs:
         port: 21
         local-dir: ./dist/
         server-dir: ./
+        log-level: verbose
         exclude: |
           **/.git*
           **/.git*/**
@@ -57,12 +75,20 @@ jobs:
           **/.env*
           **/Thumbs.db
           
+    - name: 📋 List uploaded files
+      if: success()
+      run: |
+        echo "🎉 Files uploaded to root directory of FTP account"
+        echo "🌐 Site should be available at: https://explora.ieeetadeo.org"
+        echo "📁 Files are directly in the explora root directory"
+          
     - name: ✅ Deployment Success
       if: success()
       run: |
         echo "🎉 Deployment completed successfully!"
         echo "🌐 Your app should be available at: https://explora.ieeetadeo.org"
         echo "📊 Build size: $(du -sh dist/ | cut -f1)"
+        echo "🔍 Files uploaded to root directory (no subdirectories created)"
         
     - name: ❌ Deployment Failed
       if: failure()
