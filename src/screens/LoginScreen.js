@@ -9,13 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useAuth } from '../contexts/NewAuthContext';
+import { useAuth } from '../contexts/SimpleAuthContext';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
+
 
   const handleLogin = async () => {
     console.log('🔐 Intentando login con:', { email, passwordLength: password.length });
@@ -97,6 +98,7 @@ const LoginScreen = ({ navigation }) => {
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Text>
           </TouchableOpacity>
+
 
           <TouchableOpacity
             style={styles.linkButton}

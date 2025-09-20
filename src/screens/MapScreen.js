@@ -275,7 +275,7 @@ const MapScreen = () => {
                   <Text style={styles.dataScientific}>{item.scientific_name}</Text>
                 )}
                 <Text style={styles.dataLocation}>
-                  {item.location_description || `${item.latitude?.toFixed(4)}, ${item.longitude?.toFixed(4)}`}
+                  {item.location_description || `${parseFloat(item.latitude || 0).toFixed(4)}, ${parseFloat(item.longitude || 0).toFixed(4)}`}
                 </Text>
                 <Text style={styles.dataDate}>
                   {new Date(item.created_at).toLocaleDateString()}

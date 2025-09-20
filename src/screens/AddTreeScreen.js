@@ -4,14 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 // Supabase removido - usando sistema simple
-import { useAuth } from '../contexts/NewAuthContext';
-import newTreeService from '../services/NewTreeService';
-import hybridTreeService from '../services/HybridTreeService';
-import eventEmitter, { EVENTS } from '../utils/EventEmitter';
+import { useAuth } from '../contexts/SimpleAuthContext';
+import SimpleTreeService from '../services/SimpleTreeService';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
-import webNotifications from '../utils/WebNotifications';
+import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import DynamicMapView from '../components/DynamicMapView';
+import webNotifications from '../utils/WebNotifications';
 
 const AddTreeScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -201,10 +200,21 @@ const AddTreeScreen = ({ navigation }) => {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
+      base64: Platform.OS === 'web', // Obtener base64 en web para poder mostrar la imagen
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      const imageUri = result.assets[0].uri;
+      
+      // En web, crear una URL que funcione para mostrar la imagen
+      if (Platform.OS === 'web' && result.assets[0].base64) {
+        const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        console.log('📸 [takePhoto] Imagen base64 generada para web:', base64Image.substring(0, 50) + '...');
+        setImage(base64Image);
+      } else {
+        console.log('📸 [takePhoto] Usando URI nativa:', imageUri);
+        setImage(imageUri);
+      }
     }
   };
 
@@ -220,10 +230,21 @@ const AddTreeScreen = ({ navigation }) => {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
+      base64: Platform.OS === 'web', // Obtener base64 en web para poder mostrar la imagen
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      const imageUri = result.assets[0].uri;
+      
+      // En web, crear una URL que funcione para mostrar la imagen
+      if (Platform.OS === 'web' && result.assets[0].base64) {
+        const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        console.log('📸 [pickFromGallery] Imagen base64 generada para web:', base64Image.substring(0, 50) + '...');
+        setImage(base64Image);
+      } else {
+        console.log('📸 [pickFromGallery] Usando URI nativa:', imageUri);
+        setImage(imageUri);
+      }
     }
   };
 
@@ -291,21 +312,24 @@ const AddTreeScreen = ({ navigation }) => {
         height_meters: formData.height_meters ? parseFloat(formData.height_meters) : null,
         diameter_cm: formData.diameter_cm ? parseFloat(formData.diameter_cm) : null,
         health_status: formData.health_status.trim() || null,
+        image_url: image || null, // Incluir la imagen seleccionada
       };
+
+      console.log('📸 [AddTreeScreen] Imagen incluida en treeData:', image ? image.substring(0, 50) + '...' : 'Sin imagen');
 
       console.log('🚀 [AddTreeScreen] TreeData preparado:', treeData);
       
-      // Usar el servicio híbrido que maneja localStorage Y MySQL
-      const result = await hybridTreeService.createTree(treeData, image);
+      // Usar el servicio simple que solo usa MySQL remoto
+      const treeService = new SimpleTreeService();
+      const createdTree = await treeService.createTree(treeData);
       
-      if (result.success) {
-        console.log('✅ [AddTreeScreen] Árbol creado exitosamente:', result);
-        showSuccess('¡Árbol registrado exitosamente!');
-        
-        // Emitir evento para actualizar listas
-        console.log('📡 [AddTreeScreen] Emitiendo evento TREE_CREATED:', result.tree);
-        eventEmitter.emit(EVENTS.TREE_CREATED, result.tree);
-        console.log('📡 [AddTreeScreen] Evento TREE_CREATED emitido');
+      console.log('✅ [AddTreeScreen] Árbol creado exitosamente:', createdTree);
+      showSuccess('¡Árbol registrado exitosamente!');
+      
+      // Emitir evento para actualizar listas
+      console.log('📡 [AddTreeScreen] Emitiendo evento TREE_CREATED:', createdTree);
+      eventEmitter.emit(EVENTS.TREE_CREATED, createdTree);
+      console.log('📡 [AddTreeScreen] Evento TREE_CREATED emitido');
         
         // Limpiar formulario
         setFormData({
@@ -325,10 +349,6 @@ const AddTreeScreen = ({ navigation }) => {
         setTimeout(() => {
           navigation.goBack();
         }, 1500);
-      } else {
-        console.error('❌ [AddTreeScreen] Error creando árbol:', result.error);
-        showError(`Error al registrar árbol: ${result.error}`);
-      }
 
     } catch (error) {
       console.error('❌ [AddTreeScreen] Error completo al guardar árbol:', error);

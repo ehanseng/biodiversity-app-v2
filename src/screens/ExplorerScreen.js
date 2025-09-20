@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,16 +12,17 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/NewAuthContext';
-import TreeStorageService from '../services/TreeStorageService';
+import { useAuth } from '../contexts/SimpleAuthContext';
+import SimpleTreeService from '../services/SimpleTreeService';
+import SimpleAnimalService from '../services/SimpleAnimalService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
 const ExplorerScreen = ({ navigation, route }) => {
-  const { user, getAllTrees } = useAuth();
-  const [trees, setTrees] = useState([]);
+  const { user } = useAuth();
+  const [records, setRecords] = useState([]); // Cambio: trees -> records para incluir árboles y animales
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState(route?.params?.initialFilter || 'all'); // all, mine, approved, pending, local, rejected
+  const [filter, setFilter] = useState(route?.params?.initialFilter || 'all'); // all, mine, approved, pending, rejected
   const [fabOpen, setFabOpen] = useState(false);
   const animation = useState(new Animated.Value(0))[0];
 
@@ -71,36 +72,58 @@ const ExplorerScreen = ({ navigation, route }) => {
   const loadTrees = async () => {
     try {
       setLoading(true);
-      console.log('🌳 [ExplorerScreen] Cargando árboles híbridos...');
+      console.log('🌳 [ExplorerScreen] Cargando registros de biodiversidad desde MySQL remoto...');
       console.log('👤 [ExplorerScreen] User ID:', user?.id);
       
-      const allTrees = await getAllTrees();
-      console.log('📊 [ExplorerScreen] Árboles obtenidos:', allTrees.length);
+      // Cargar árboles y animales en paralelo
+      const treeService = new SimpleTreeService();
+      const animalService = new SimpleAnimalService();
       
-      // Debug: mostrar estructura de los primeros árboles
-      if (allTrees.length > 0) {
-        console.log('🔍 [ExplorerScreen] Primer árbol:', allTrees[0]);
-        console.log('🔍 [ExplorerScreen] Campos disponibles:', Object.keys(allTrees[0]));
-        
-        // Mostrar algunos árboles para entender la estructura
-        allTrees.slice(0, 3).forEach((tree, index) => {
-          console.log(`🌳 [ExplorerScreen] Árbol ${index + 1}:`, {
-            id: tree.id,
-            common_name: tree.common_name,
-            user_id: tree.user_id,
-            status: tree.status,
-            approval_status: tree.approval_status,
-            syncStatus: tree.syncStatus,
-            source: tree.source,
-            type: tree.type
-          });
+      const [allTrees, allAnimals] = await Promise.all([
+        treeService.getAllTrees(),
+        animalService.getAllAnimals()
+      ]);
+      
+      console.log('🌳 [ExplorerScreen] Árboles obtenidos:', allTrees.length);
+      console.log('🦋 [ExplorerScreen] Animales obtenidos:', allAnimals.length);
+      
+      // Combinar y agregar tipo a cada registro
+      const allRecords = [
+        ...allTrees.map(tree => ({ ...tree, type: 'flora' })),
+        ...allAnimals.map(animal => ({ ...animal, type: 'fauna' }))
+      ];
+
+      // Deduplicar registros por ID y tipo para evitar duplicados
+      const uniqueRecords = allRecords.reduce((acc, current) => {
+        const key = `${current.type}-${current.id}`;
+        if (!acc.find(item => `${item.type}-${item.id}` === key)) {
+          acc.push(current);
+        }
+        return acc;
+      }, []);
+
+      // Ordenar por fecha de creación (más recientes primero)
+      uniqueRecords.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      console.log('📊 [ExplorerScreen] Total registros combinados:', allRecords.length);
+      console.log('🔄 [ExplorerScreen] Registros únicos después de deduplicar:', uniqueRecords.length);
+      
+      // Debug: mostrar algunos registros con sus estados
+      uniqueRecords.slice(0, 5).forEach((record, index) => {
+        console.log(`📝 [ExplorerScreen] Record ${index + 1}:`, {
+          id: record.id,
+          type: record.type,
+          user_id: record.user_id,
+          status: record.status,
+          approval_status: record.approval_status,
+          normalizedStatus: record.status || record.approval_status || 'pending'
         });
-      }
+      });
       
-      setTrees(allTrees);
+      setRecords(uniqueRecords);
     } catch (error) {
-      console.error('❌ [ExplorerScreen] Error loading trees:', error);
-      Alert.alert('Error', 'No se pudieron cargar los árboles');
+      console.log('❌ [ExplorerScreen] Error loading records:', error);
+      Alert.alert('Error', 'No se pudieron cargar los registros de biodiversidad');
     } finally {
       setLoading(false);
     }
@@ -112,135 +135,132 @@ const ExplorerScreen = ({ navigation, route }) => {
     setRefreshing(false);
   };
 
-  const getFilteredTrees = () => {
+  // Función helper para determinar si un registro es mío (reutilizable)
+  const isMyRecord = (record) => {
+    const userId = parseInt(user?.id);
+    const recordUserId = parseInt(record.user_id);
+    return userId && recordUserId === userId;
+  };
+  
+  // Función helper para obtener el estado normalizado (árboles usan approval_status, animales usan status)
+  const getRecordStatus = (record) => {
+    return record.status || record.approval_status || 'pending';
+  };
+
+  const filteredTrees = useMemo(() => {
     console.log(`🔍 [ExplorerScreen] Filtrando por: ${filter}`);
-    console.log(`📊 [ExplorerScreen] Total árboles antes de filtrar: ${trees.length}`);
+    console.log(`📊 [ExplorerScreen] Total registros antes de filtrar: ${records.length}`);
+    console.log(`👤 [ExplorerScreen] User ID: ${user?.id}`);
     
-    // Función helper para determinar el estado de un árbol
-    const getTreeStatus = (tree) => {
-      // Para árboles de MySQL
-      if (tree.source === 'mysql') {
-        return tree.status || 'pending';
-      }
-      // Para árboles locales
-      if (tree.source === 'local') {
-        return tree.syncStatus || 'pending';
-      }
-      // Fallback para otros casos
-      return tree.status || tree.approval_status || tree.syncStatus || 'pending';
-    };
-
-    // Función helper para determinar si un árbol es mío
-    const isMyTree = (tree) => {
-      const userId = parseInt(user?.id) || 1;
-      const treeUserId = parseInt(tree.user_id);
-      
-      return treeUserId === userId || 
-             (tree.source === 'local' && tree.canEdit) ||
-             tree.canEdit === true;
-    };
-
+    // Crear una copia limpia de los registros para evitar mutaciones
+    const cleanRecords = [...records];
     let filtered = [];
     
     switch (filter) {
+      case 'all':
+        // Todos = Registros aprobados de todos los usuarios del sistema
+        console.log(`🔍 [ExplorerScreen] Filtrando TODOS los aprobados`);
+        
+        filtered = cleanRecords.filter(record => {
+          const status = getRecordStatus(record);
+          const isApproved = status === 'approved';
+          
+          if (!isApproved) {
+            console.log(`📝 [ExplorerScreen] Record ${record.id} NO aprobado: status=${status}, approval_status=${record.approval_status}, raw_status=${record.status}`);
+          }
+          
+          return isApproved;
+        });
+        
+        console.log(`🎯 [ExplorerScreen] Registros aprobados encontrados: ${filtered.length}`);
+        break;
+        
       case 'mine':
-        // TODOS mis árboles (míos y locales), sin importar el estado
-        filtered = trees.filter(tree => isMyTree(tree));
+        // Míos = Todos los registros de ese usuario (aprobados, pendientes, rechazados)
+        filtered = cleanRecords.filter(record => isMyRecord(record));
         break;
         
       case 'approved':
-        // SOLO MIS árboles aprobados
-        filtered = trees.filter(tree => {
-          const isMine = isMyTree(tree);
-          const status = getTreeStatus(tree);
-          return isMine && status === 'approved';
-        });
+        // Aprobados = Solo registros aprobados de ese usuario
+        filtered = cleanRecords.filter(record => isMyRecord(record) && getRecordStatus(record) === 'approved');
         break;
         
       case 'pending':
-        // SOLO MIS árboles pendientes
-        filtered = trees.filter(tree => {
-          const isMine = isMyTree(tree);
-          const status = getTreeStatus(tree);
-          return isMine && status === 'pending';
+        // Pendientes = Registros pendientes de ese usuario
+        console.log(`🔍 [ExplorerScreen] Filtrando PENDIENTES para usuario: ${user?.id}`);
+        
+        filtered = cleanRecords.filter(record => {
+          const isMine = isMyRecord(record);
+          const status = getRecordStatus(record);
+          const isPending = status === 'pending';
+          
+          // Log detallado para cada registro
+          console.log(`📝 [ExplorerScreen] Record ${record.id} (${record.type}):`, {
+            user_id: record.user_id,
+            isMine,
+            status,
+            approval_status: record.approval_status,
+            raw_status: record.status,
+            isPending,
+            shouldInclude: isMine && isPending
+          });
+          
+          return isMine && isPending;
         });
+        
+        console.log(`🎯 [ExplorerScreen] Registros pendientes encontrados: ${filtered.length}`);
         break;
         
       case 'rejected':
-        // SOLO MIS árboles rechazados
-        filtered = trees.filter(tree => {
-          const isMine = isMyTree(tree);
-          const status = getTreeStatus(tree);
-          return isMine && status === 'rejected';
-        });
+        // Rechazados = Registros rechazados de ese usuario
+        filtered = cleanRecords.filter(record => isMyRecord(record) && getRecordStatus(record) === 'rejected');
         break;
         
-      case 'local':
-        // SOLO MIS árboles locales (no sincronizados)
-        filtered = trees.filter(tree => {
-          const isMine = isMyTree(tree);
-          return isMine && (tree.source === 'local' || tree.syncStatus === 'error');
-        });
-        break;
-        
-      default: // 'all'
-        // TODOS los árboles aprobados (míos y de otros usuarios)
-        filtered = trees.filter(tree => {
-          const status = getTreeStatus(tree);
-          return status === 'approved';
-        });
+      default:
+        // Por defecto, mostrar todos los aprobados
+        filtered = cleanRecords.filter(record => getRecordStatus(record) === 'approved');
         break;
     }
     
-    console.log(`✅ [ExplorerScreen] Árboles filtrados (${filter}): ${filtered.length}`);
+    console.log(`✅ [ExplorerScreen] Registros filtrados (${filter}): ${filtered.length}`);
     
-    // Debug: mostrar algunos árboles filtrados
+    // Debug: mostrar los primeros registros filtrados con detalles completos
     if (filtered.length > 0) {
-      filtered.slice(0, 2).forEach((tree, index) => {
-        console.log(`🌳 [ExplorerScreen] Filtrado ${index + 1}:`, {
-          id: tree.id,
-          name: tree.common_name,
-          user_id: tree.user_id,
-          status: getTreeStatus(tree),
-          source: tree.source,
-          isMine: isMyTree(tree)
+      console.log(`🔍 [ExplorerScreen] Primeros registros del filtro "${filter}":`);
+      filtered.slice(0, 3).forEach((record, index) => {
+        console.log(`📝 [ExplorerScreen] #${index + 1}:`, {
+          id: record.id,
+          type: record.type,
+          name: record.common_name,
+          user_id: record.user_id,
+          status: record.status,
+          approval_status: record.approval_status,
+          normalizedStatus: getRecordStatus(record),
+          isMine: isMyRecord(record)
         });
       });
     }
     
     return filtered;
-  };
+  }, [records, filter, user?.id]);
 
-  const getStatusColor = (tree) => {
-    if (tree.source === 'local') {
-      switch (tree.syncStatus) {
-        case 'pending': return '#ffc107';
-        case 'synced': return '#28a745';
-        case 'error': return '#dc3545';
-        default: return '#6c757d';
-      }
-    } else {
-      switch (tree.approval_status || tree.status) {
-        case 'approved': return '#28a745';
-        case 'pending': return '#ffc107';
-        case 'rejected': return '#dc3545';
-        default: return '#6c757d';
-      }
+  const getStatusColor = (record) => {
+    const status = getRecordStatus(record);
+    switch (status) {
+      case 'approved': return '#28a745';
+      case 'pending': return '#ffc107';
+      case 'rejected': return '#dc3545';
+      default: return '#6c757d';
     }
   };
 
-  const getStatusText = (tree) => {
-    if (tree.source === 'local') {
-      return '📱 Local';
-    } else if (tree.syncStatus === 'error') {
-      return '🚫 Error Subida';
-    } else {
-      switch (tree.approval_status || tree.status) {
-        case 'approved': return '✅ Aprobado';
-        case 'pending': return '⏳ Pendiente Aprobación';
-        case 'rejected': return '❌ Rechazado';
-        default: return '⏳ Pendiente Aprobación';
-      }
+  const getStatusText = (record) => {
+    const status = getRecordStatus(record);
+    switch (status) {
+      case 'approved': return '✅ Aprobado';
+      case 'pending': return '⏳ Pendiente';
+      case 'rejected': return '❌ Rechazado';
+      default: return '❓ Desconocido';
     }
   };
 
@@ -263,16 +283,16 @@ const ExplorerScreen = ({ navigation, route }) => {
     
     Alert.alert(
       tree.common_name,
-      ` ${tree.scientific_name || 'Sin nombre científico'}
+      `${tree.scientific_name || 'Sin nombre científico'}
 
- ${tree.location_description || 'Ubicación no especificada'}
+${tree.location_description || 'Ubicación no especificada'}
 
- Altura: ${tree.height || 'No especificada'} m
- Diámetro: ${tree.diameter || 'No especificado'} cm
- Estado: ${tree.health_status || 'No especificado'}
+Altura: ${tree.height || 'No especificada'} m
+Diámetro: ${tree.diameter || 'No especificado'} cm
+Estado: ${tree.health_status || 'No especificado'}
 
- Registrado por: ${creatorName}
- Fecha: ${new Date(tree.created_at || tree.createdAt).toLocaleDateString()}
+Registrado por: ${creatorName}
+Fecha: ${new Date(tree.created_at || tree.createdAt).toLocaleDateString()}
 
 ${tree.description || ''}`,
       [
@@ -402,39 +422,31 @@ ${tree.description || ''}`,
     );
   };
 
-  const FilterButton = ({ filterKey, title, count }) => (
+  const FilterButton = ({ filterKey, title, count, iconName, iconColor }) => (
     <TouchableOpacity
       style={[styles.filterButton, filter === filterKey && styles.activeFilter]}
       onPress={() => setFilter(filterKey)}
     >
-      <Text style={[styles.filterText, filter === filterKey && styles.activeFilterText]}>
-        {title} ({count})
-      </Text>
+      <View style={styles.filterButtonContent}>
+        <Ionicons 
+          name={iconName} 
+          size={20} 
+          color={filter === filterKey ? '#fff' : (iconColor || '#6c757d')} 
+        />
+        <Text style={[styles.filterText, filter === filterKey && styles.activeFilterText]}>
+          {count}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 
-  const filteredTrees = getFilteredTrees();
-  
-  // Funciones helper reutilizables para contadores
-  const getTreeStatus = (tree) => {
-    if (tree.source === 'mysql') return tree.status || 'pending';
-    if (tree.source === 'local') return tree.syncStatus || 'pending';
-    return tree.status || tree.approval_status || tree.syncStatus || 'pending';
-  };
 
-  const isMyTree = (tree) => {
-    const userId = parseInt(user?.id) || 1;
-    const treeUserId = parseInt(tree.user_id);
-    return treeUserId === userId || (tree.source === 'local' && tree.canEdit) || tree.canEdit === true;
-  };
-  
-  // Contadores actualizados con la nueva lógica
-  const allCount = trees.filter(tree => getTreeStatus(tree) === 'approved').length;
-  const myTreesCount = trees.filter(tree => isMyTree(tree)).length;
-  const approvedCount = trees.filter(tree => isMyTree(tree) && getTreeStatus(tree) === 'approved').length;
-  const pendingCount = trees.filter(tree => isMyTree(tree) && getTreeStatus(tree) === 'pending').length;
-  const rejectedCount = trees.filter(tree => isMyTree(tree) && getTreeStatus(tree) === 'rejected').length;
-  const localCount = trees.filter(tree => isMyTree(tree) && (tree.source === 'local' || tree.syncStatus === 'error')).length;
+  // Contadores actualizados para registros híbridos (árboles + animales)
+  const allCount = records.filter(record => getRecordStatus(record) === 'approved').length;
+  const myRecordsCount = records.filter(record => isMyRecord(record)).length;
+  const approvedCount = records.filter(record => isMyRecord(record) && getRecordStatus(record) === 'approved').length;
+  const pendingCount = records.filter(record => isMyRecord(record) && getRecordStatus(record) === 'pending').length;
+  const rejectedCount = records.filter(record => isMyRecord(record) && getRecordStatus(record) === 'rejected').length;
 
   const toggleFabMenu = () => {
     const toValue = fabOpen ? 0 : 1;
@@ -451,24 +463,53 @@ ${tree.description || ''}`,
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Explorador de Biodiversidad</Text>
-        <Text style={styles.headerSubtitle}>{trees.length} registros encontrados</Text>
+        <Text style={styles.headerSubtitle}>{records.length} registros encontrados</Text>
       </View>
 
       {/* Filtros */}
       <View style={styles.filtersContainer}>
-        <FilterButton filterKey="all" title="Todos" count={allCount} />
-        <FilterButton filterKey="mine" title="Míos" count={myTreesCount} />
-        <FilterButton filterKey="approved" title="Aprobados" count={approvedCount} />
-        <FilterButton filterKey="pending" title="Pendientes" count={pendingCount} />
-        <FilterButton filterKey="rejected" title="Rechazados" count={rejectedCount} />
-        <FilterButton filterKey="local" title="Locales" count={localCount} />
+        <FilterButton 
+          filterKey="all" 
+          title="Todos" 
+          count={allCount} 
+          iconName="globe-outline" 
+          iconColor="#17a2b8" 
+        />
+        <FilterButton 
+          filterKey="mine" 
+          title="Míos" 
+          count={myRecordsCount} 
+          iconName="person-outline" 
+          iconColor="#6f42c1" 
+        />
+        <FilterButton 
+          filterKey="approved" 
+          title="Aprobados" 
+          count={approvedCount} 
+          iconName="checkmark-circle-outline" 
+          iconColor="#28a745" 
+        />
+        <FilterButton 
+          filterKey="pending" 
+          title="Pendientes" 
+          count={pendingCount} 
+          iconName="time-outline" 
+          iconColor="#ffc107" 
+        />
+        <FilterButton 
+          filterKey="rejected" 
+          title="Rechazados" 
+          count={rejectedCount} 
+          iconName="close-circle-outline" 
+          iconColor="#dc3545" 
+        />
       </View>
 
       {/* Lista de árboles */}
       <FlatList
         data={filteredTrees}
         renderItem={renderTreeItem}
-        keyExtractor={(item) => item.id || item.databaseId || `local-${item.createdAt}`}
+        keyExtractor={(item) => `${item.type || 'unknown'}-${item.id || item.databaseId || Math.random()}`}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
@@ -476,20 +517,20 @@ ${tree.description || ''}`,
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="leaf-outline" size={64} color="#6c757d" />
-            <Text style={styles.emptyTitle}>No hay árboles</Text>
+            <Ionicons name="earth-outline" size={64} color="#6c757d" />
+            <Text style={styles.emptyTitle}>No hay registros</Text>
             <Text style={styles.emptySubtitle}>
               {filter === 'mine' 
-                ? 'Aún no has registrado ningún árbol'
-                : 'No se encontraron árboles con este filtro'
+                ? 'Aún no has registrado ningún elemento de biodiversidad'
+                : 'No se encontraron registros con este filtro'
               }
             </Text>
             {filter === 'mine' && (
               <TouchableOpacity
                 style={styles.addButton}
-                onPress={() => navigation.navigate('AddTree')}
+                onPress={toggleFabMenu}
               >
-                <Text style={styles.addButtonText}>Agregar Primer Árbol</Text>
+                <Text style={styles.addButtonText}>Hacer Primer Registro</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -556,7 +597,7 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     marginHorizontal: 4,
     borderRadius: 20,
@@ -566,10 +607,15 @@ const styles = StyleSheet.create({
   activeFilter: {
     backgroundColor: '#2d5016',
   },
+  filterButtonContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   filterText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6c757d',
-    fontWeight: '600',
+    fontWeight: '700',
+    marginTop: 4,
   },
   activeFilterText: {
     color: '#ffffff',

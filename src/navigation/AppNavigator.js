@@ -2,10 +2,9 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/NewAuthContext';
+import { useAuth } from '../contexts/SimpleAuthContext';
 import LoadingScreen from '../components/LoadingScreen';
-import { useNavigation } from '@react-navigation/native';
-import { View, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -27,8 +26,15 @@ import AddAnimalScreen from '../screens/AddAnimalScreen';
 import ScientistApprovalScreen from '../screens/ScientistApprovalScreen';
 import MySQLTestScreen from '../screens/MySQLTestScreen';
 
+// Biodiversity Screens
+import ExplorerMenuScreen from '../screens/ExplorerMenuScreen';
+import TreeExplorerScreen from '../screens/TreeExplorerScreen';
+import AnimalExplorerScreen from '../screens/AnimalExplorerScreen';
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+
+
 
 const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -43,7 +49,14 @@ const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false,
+        headerShown: true,
+        headerStyle: {
+          backgroundColor: '#2d5016',
+        },
+        headerTintColor: '#ffffff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
@@ -51,8 +64,10 @@ const MainTabs = () => {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Map') {
             iconName = focused ? 'map' : 'map-outline';
-          } else if (route.name === 'Explorer') {
-            iconName = focused ? 'albums' : 'albums-outline';
+          } else if (route.name === 'Plantas') {
+            iconName = focused ? 'leaf' : 'leaf-outline';
+          } else if (route.name === 'Animales') {
+            iconName = focused ? 'paw' : 'paw-outline';
           } else if (route.name === 'Scientist') {
             iconName = focused ? 'flask' : 'flask-outline';
           } else if (route.name === 'Admin') {
@@ -68,7 +83,16 @@ const MainTabs = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Explorer" component={ExplorerScreen} />
+      <Tab.Screen 
+        name="Plantas" 
+        component={TreeExplorerScreen}
+        options={{ title: 'Plantas' }}
+      />
+      <Tab.Screen 
+        name="Animales" 
+        component={AnimalExplorerScreen}
+        options={{ title: 'Animales' }}
+      />
       
       {profile?.role === 'scientist' && <Tab.Screen name="Scientist" component={ScientistScreen} />}
       {profile?.role === 'admin' && <Tab.Screen name="Admin" component={AdminScreen} />}
@@ -79,13 +103,22 @@ const MainTabs = () => {
   );
 };
 
+const MainTabsWithMenu = () => {
+  return <MainTabs />;
+};
+
 const MainStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="MainTabs" component={MainTabs} />
+    <Stack.Screen name="MainTabs" component={MainTabsWithMenu} />
     <Stack.Screen name="AddTree" component={AddTreeScreen} />
     <Stack.Screen name="AddAnimal" component={AddAnimalScreen} />
     <Stack.Screen name="ScientistApproval" component={ScientistApprovalScreen} />
     <Stack.Screen name="MySQLTest" component={MySQLTestScreen} />
+    
+    {/* Biodiversity Explorers */}
+    <Stack.Screen name="TreeExplorer" component={TreeExplorerScreen} />
+    <Stack.Screen name="AnimalExplorer" component={AnimalExplorerScreen} />
+    <Stack.Screen name="Explorer" component={ExplorerScreen} />
   </Stack.Navigator>
 );
 
@@ -98,5 +131,10 @@ const AppNavigator = () => {
 
   return user ? <MainStack /> : <AuthStack />;
 };
+
+
+const styles = StyleSheet.create({
+  // Estilos limpios - menú flotante removido completamente
+});
 
 export default AppNavigator;

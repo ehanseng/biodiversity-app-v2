@@ -61,23 +61,17 @@ $method = $_SERVER['REQUEST_METHOD'];
 // Log para debugging
 error_log("API Request: $method /$endpoint (from: $request_uri)");
 
-// Rutas de la API
+// Manejar diferentes endpoints
 switch ($endpoint) {
-    case 'help':
-        echo json_encode([
-            'message' => 'Biodiversity API',
-            'version' => '1.0',
-            'request_uri' => $request_uri,
-            'detected_endpoint' => $endpoint,
-            'endpoints' => [
-                '/api/health' => 'Check API status',
-                '/api/records' => 'Get all biodiversity records',
-                '/api/users' => 'Get all users',
-                '/api/stats' => 'Get statistics'
-            ]
-        ]);
+    case 'records':
+        handleRecords($pdo, $resourceId);
         break;
-        
+    case 'users':
+        handleUsers($pdo, $resourceId);
+        break;
+    case 'stats':
+        handleStats($pdo);
+        break;
     case 'health':
         if ($method === 'GET') {
             echo json_encode([
@@ -89,6 +83,26 @@ switch ($endpoint) {
                 'endpoint_detected' => $endpoint
             ]);
         }
+        break;
+    case 'help':
+    default:
+        echo json_encode([
+            'message' => 'Biodiversity API v1.0',
+            'endpoints' => [
+                'GET /api/records' => 'Obtener todos los registros',
+                'POST /api/records' => 'Crear nuevo registro',
+                'PUT /api/records/{id}' => 'Actualizar registro',
+                'DELETE /api/records/{id}' => 'Eliminar registro',
+                'GET /api/users' => 'Obtener todos los usuarios',
+                'POST /api/users' => 'Crear nuevo usuario',
+                'POST /api/users/login' => 'Login de usuario',
+                'POST /api/users/check-email' => 'Verificar si email existe',
+                'PUT /api/users/{id}' => 'Actualizar usuario',
+                'DELETE /api/users/{id}' => 'Eliminar usuario',
+                'GET /api/stats' => 'Obtener estadísticas',
+                'GET /api/health' => 'Estado de la API'
+            ]
+        ]);
         break;
         
     case 'records':
@@ -275,37 +289,6 @@ switch ($endpoint) {
         }
         break;
         
-    case 'stats':
-        if ($method === 'GET') {
-            try {
-                $stats = [];
-                
-                $stmt = $pdo->query('SELECT COUNT(*) as total FROM biodiversity_records');
-                $stats['total_records'] = (int)$stmt->fetchColumn();
-                
-                $stmt = $pdo->query("SELECT COUNT(*) as flora FROM biodiversity_records WHERE type = 'flora'");
-                $stats['flora_count'] = (int)$stmt->fetchColumn();
-                
-                $stmt = $pdo->query("SELECT COUNT(*) as fauna FROM biodiversity_records WHERE type = 'fauna'");
-                $stats['fauna_count'] = (int)$stmt->fetchColumn();
-                
-                $stmt = $pdo->query("SELECT COUNT(*) as approved FROM biodiversity_records WHERE status = 'approved'");
-                $stats['approved_count'] = (int)$stmt->fetchColumn();
-                
-                $stmt = $pdo->query("SELECT COUNT(*) as pending FROM biodiversity_records WHERE status = 'pending'");
-                $stats['pending_count'] = (int)$stmt->fetchColumn();
-                
-                $stmt = $pdo->query('SELECT COUNT(*) as users FROM users');
-                $stats['users_count'] = (int)$stmt->fetchColumn();
-                
-                echo json_encode($stats);
-            } catch (PDOException $e) {
-                http_response_code(500);
-                echo json_encode(['error' => 'Failed to fetch stats: ' . $e->getMessage()]);
-            }
-        }
-        break;
-        
     default:
         http_response_code(404);
         echo json_encode([
@@ -320,4 +303,166 @@ switch ($endpoint) {
         ]);
         break;
 }
+
+// Función para manejar usuarios
+function handleUsers($pdo, $resourceId = null) {
+    $method = $_SERVER['REQUEST_METHOD'];
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    try {
+        switch ($method) {
+            case 'GET':
+                if ($resourceId) {
+                    // Obtener usuario específico
+                    $stmt = $pdo->prepare("SELECT id, email, full_name, role, created_at FROM users WHERE id = ?");
+                    $stmt->execute([$resourceId]);
+                    $user = $stmt->fetch();
+                    
+                    if ($user) {
+                        echo json_encode($user);
+                    } else {
+                        http_response_code(404);
+                        echo json_encode(['error' => 'Usuario no encontrado']);
+                    }
+                } else {
+                    // Obtener todos los usuarios
+                    $stmt = $pdo->query("SELECT id, email, full_name, role, created_at FROM users ORDER BY created_at DESC");
+                    $users = $stmt->fetchAll();
+                    echo json_encode($users);
+                }
+                break;
+                
+            case 'POST':
+                if ($resourceId === 'login') {
+                    // Login de usuario
+                    if (!isset($input['email']) || !isset($input['password'])) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Email y contraseña requeridos']);
+                        return;
+                    }
+                    
+                    $stmt = $pdo->prepare("SELECT id, email, full_name, role, password FROM users WHERE email = ?");
+                    $stmt->execute([$input['email']]);
+                    $user = $stmt->fetch();
+                    
+                    if ($user && password_verify($input['password'], $user['password'])) {
+                        // Login exitoso - no devolver password
+                        unset($user['password']);
+                        echo json_encode($user);
+                    } else {
+                        http_response_code(401);
+                        echo json_encode(['error' => 'Credenciales inválidas']);
+                    }
+                } elseif ($resourceId === 'check-email') {
+                    // Verificar si email existe
+                    if (!isset($input['email'])) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Email requerido']);
+                        return;
+                    }
+                    
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+                    $stmt->execute([$input['email']]);
+                    $exists = $stmt->fetchColumn() > 0;
+                    
+                    echo json_encode(['exists' => $exists]);
+                } else {
+                    // Crear nuevo usuario
+                    if (!isset($input['email']) || !isset($input['password'])) {
+                        http_response_code(400);
+                        echo json_encode(['error' => 'Email y contraseña requeridos']);
+                        return;
+                    }
+                    
+                    // Verificar si el email ya existe
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+                    $stmt->execute([$input['email']]);
+                    if ($stmt->fetchColumn() > 0) {
+                        http_response_code(409);
+                        echo json_encode(['error' => 'El email ya está registrado']);
+                        return;
+                    }
+                    
+                    // Crear tabla users si no existe
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS users (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        password VARCHAR(255) NOT NULL,
+                        full_name VARCHAR(255),
+                        role ENUM('admin', 'scientist', 'explorer', 'visitor') DEFAULT 'explorer',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                    )");
+                    
+                    // Hash de la contraseña
+                    $hashedPassword = password_hash($input['password'], PASSWORD_DEFAULT);
+                    
+                    $stmt = $pdo->prepare("INSERT INTO users (email, password, full_name, role) VALUES (?, ?, ?, ?)");
+                    $stmt->execute([
+                        $input['email'],
+                        $hashedPassword,
+                        $input['full_name'] ?? $input['email'],
+                        $input['role'] ?? 'explorer'
+                    ]);
+                    
+                    $userId = $pdo->lastInsertId();
+                    
+                    // Devolver usuario creado (sin password)
+                    $stmt = $pdo->prepare("SELECT id, email, full_name, role, created_at FROM users WHERE id = ?");
+                    $stmt->execute([$userId]);
+                    $user = $stmt->fetch();
+                    
+                    http_response_code(201);
+                    echo json_encode($user);
+                }
+                break;
+                
+            default:
+                http_response_code(405);
+                echo json_encode(['error' => 'Método no permitido']);
+                break;
+        }
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Error de base de datos: ' . $e->getMessage()]);
+    }
+}
+
+// Función para manejar estadísticas
+function handleStats($pdo) {
+    $method = $_SERVER['REQUEST_METHOD'];
+    
+    if ($method === 'GET') {
+        try {
+            $stats = [];
+            
+            $stmt = $pdo->query('SELECT COUNT(*) as total FROM biodiversity_records');
+            $stats['total_records'] = (int)$stmt->fetchColumn();
+            
+            $stmt = $pdo->query("SELECT COUNT(*) as flora FROM biodiversity_records WHERE type = 'flora'");
+            $stats['flora_count'] = (int)$stmt->fetchColumn();
+            
+            $stmt = $pdo->query("SELECT COUNT(*) as fauna FROM biodiversity_records WHERE type = 'fauna'");
+            $stats['fauna_count'] = (int)$stmt->fetchColumn();
+            
+            $stmt = $pdo->query("SELECT COUNT(*) as approved FROM biodiversity_records WHERE status = 'approved'");
+            $stats['approved_count'] = (int)$stmt->fetchColumn();
+            
+            $stmt = $pdo->query("SELECT COUNT(*) as pending FROM biodiversity_records WHERE status = 'pending'");
+            $stats['pending_count'] = (int)$stmt->fetchColumn();
+            
+            $stmt = $pdo->query('SELECT COUNT(*) as users FROM users');
+            $stats['users_count'] = (int)$stmt->fetchColumn();
+            
+            echo json_encode($stats);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to fetch stats: ' . $e->getMessage()]);
+        }
+    } else {
+        http_response_code(405);
+        echo json_encode(['error' => 'Método no permitido']);
+    }
+}
+
 ?>

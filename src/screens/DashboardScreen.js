@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 // Supabase removido - usando datos mock
-import { useAuth } from '../contexts/NewAuthContext';
+import { useAuth } from '../contexts/SimpleAuthContext';
 
 const DashboardScreen = ({ navigation }) => {
   const { user, profile } = useAuth();

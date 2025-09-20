@@ -10,15 +10,12 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/NewAuthContext';
-import hybridTreeService from '../services/HybridTreeService';
-import TreeStorageService from '../services/TreeStorageService';
+import { useAuth } from '../contexts/SimpleAuthContext';
+import SimpleTreeService from '../services/SimpleTreeService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
-import SimpleTreeStorage from '../services/SimpleTreeStorage';
-import mySQLService from '../services/MySQLService';
 
 const HomeScreen = ({ navigation }) => {
-  const { user, profile, syncStats, forceSyncTrees, refreshProfile, getStats } = useAuth();
+  const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [treeStats, setTreeStats] = useState({
     totalTrees: 0,
@@ -27,6 +24,9 @@ const HomeScreen = ({ navigation }) => {
     pendingTrees: 0,
     rejectedTrees: 0,
     localTrees: 0,
+    flora: 0,
+    fauna: 0,
+    explorerPoints: 0,
   });
   const [syncing, setSyncing] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
@@ -41,8 +41,7 @@ const HomeScreen = ({ navigation }) => {
         // 1. Cargar estadísticas actualizadas
         await loadTreeStats();
         
-        // 2. Refrescar perfil
-        await refreshProfile();
+        // 2. Usuario ya está cargado en el contexto simple
         
       } catch (error) {
         console.error('❌ [HomeScreen] Error en inicialización:', error);
@@ -80,8 +79,7 @@ const HomeScreen = ({ navigation }) => {
   // También escuchar cuando la pantalla recibe focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', async () => {
-      console.log('🔄 [HomeScreen] Pantalla enfocada, ejecutando auto-sync...');
-      await hybridTreeService.autoSync();
+      console.log('🔄 [HomeScreen] Pantalla enfocada, recargando estadísticas...');
       await loadTreeStats();
     });
 
@@ -90,47 +88,64 @@ const HomeScreen = ({ navigation }) => {
 
   const loadTreeStats = async () => {
     try {
-      console.log('📊 [HomeScreen] Cargando estadísticas de la comunidad...');
+      console.log('📊 [HomeScreen] Cargando estadísticas desde MySQL remoto...');
       
-      // Obtener árboles locales pendientes del usuario
-      const localTrees = SimpleTreeStorage.getLocalTrees();
-      const pendingLocalTrees = localTrees.filter(tree => 
-        !tree.mysql_id && (tree.syncStatus !== 'synced') && tree.common_name
-      );
+      const treeService = new SimpleTreeService();
       
-      // Obtener estadísticas del servidor MySQL
-      let communityStats = { flora: 0, fauna: 0, total: 0 };
-      try {
-        const serverTrees = await mySQLService.getAllRecords();
-        console.log('🌐 [HomeScreen] Registros de la comunidad:', serverTrees.length);
-        
-        // Solo contar registros aprobados de la comunidad
-        const approvedTrees = serverTrees.filter(tree => tree.status === 'approved');
-        
-        communityStats = {
-          flora: approvedTrees.filter(tree => tree.type === 'flora' || !tree.type).length,
-          fauna: approvedTrees.filter(tree => tree.type === 'fauna').length,
-          total: approvedTrees.length,
-          pending: pendingLocalTrees.length // Árboles pendientes del usuario
-        };
-        
-        console.log('🌳 [HomeScreen] Estadísticas de la comunidad:', communityStats);
-      } catch (error) {
-        console.warn('⚠️ [HomeScreen] Error obteniendo datos de la comunidad:', error.message);
+      // Obtener todos los árboles del servidor
+      const allTrees = await treeService.getAllTrees();
+      console.log('🌐 [HomeScreen] Árboles totales del servidor:', allTrees.length);
+      
+      // Obtener árboles del usuario actual
+      let myTrees = [];
+      if (user?.id) {
+        myTrees = await treeService.getTreesByUser(user.id);
+        console.log('👤 [HomeScreen] Mis árboles:', myTrees.length);
+        console.log('👤 [HomeScreen] Mis árboles aprobados:', myTrees.filter(tree => tree.status === 'approved').length);
+        console.log('👤 [HomeScreen] Estados de mis árboles:', myTrees.map(tree => tree.status));
       }
-
-      setTreeStats(communityStats);
+      
+      // Calcular estadísticas
+      const stats = {
+        totalTrees: allTrees.length,
+        myTrees: myTrees.length,
+        approvedTrees: allTrees.filter(tree => tree.status === 'approved').length,
+        pendingTrees: allTrees.filter(tree => tree.status === 'pending').length,
+        rejectedTrees: allTrees.filter(tree => tree.status === 'rejected').length,
+        localTrees: 0, // Ya no usamos localStorage
+        // Calcular flora y fauna aprobada del usuario actual
+        flora: myTrees.filter(tree => tree.status === 'approved').length, // Árboles aprobados del usuario
+        fauna: 0 // Por ahora solo tenemos árboles, fauna será 0
+      };
+      
+      // Calcular puntos de explorador: árboles x 100 + animales x 200
+      const explorerPoints = (stats.flora * 100) + (stats.fauna * 200);
+      stats.explorerPoints = explorerPoints;
+      
+      console.log('📊 [HomeScreen] Estadísticas calculadas:', stats);
+      setTreeStats(stats);
+      
     } catch (error) {
-      console.error('❌ Error loading community stats:', error);
+      console.error('❌ [HomeScreen] Error cargando estadísticas:', error);
+      // Estadísticas por defecto en caso de error
+      setTreeStats({
+        totalTrees: 0,
+        myTrees: 0,
+        approvedTrees: 0,
+        pendingTrees: 0,
+        rejectedTrees: 0,
+        localTrees: 0,
+        flora: 0,
+        fauna: 0,
+        explorerPoints: 0
+      });
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      console.log('🔄 [HomeScreen] Refresh manual - ejecutando auto-sync...');
-      // Ejecutar auto-sync para detectar cambios del servidor
-      await hybridTreeService.autoSync();
+      console.log('🔄 [HomeScreen] Refresh manual - recargando estadísticas...');
       // Recargar estadísticas
       await loadTreeStats();
     } catch (error) {
@@ -145,36 +160,13 @@ const HomeScreen = ({ navigation }) => {
     
     setSyncing(true);
     try {
-      console.log('🔄 [HomeScreen] Iniciando sincronización manual...');
+      console.log('🔄 [HomeScreen] Recargando datos desde servidor...');
       
-      // Limpiar datos locales primero
-      console.log('🧹 [HomeScreen] Limpiando datos locales...');
-      const cleanResult = await hybridTreeService.cleanLocalData();
-      console.log(`🧹 [HomeScreen] Limpieza: ${cleanResult.removed} elementos eliminados`);
-      
-      // Usar HybridTreeService para sincronizar
-      const result = await hybridTreeService.syncLocalToMySQL();
-      
-      console.log(`✅ [HomeScreen] Sincronización completada: ${result.synced} exitosos, ${result.errors} errores`);
-      
-      // Recargar estadísticas siempre
-      console.log('🔄 [HomeScreen] Recargando estadísticas...');
+      // Simplemente recargar estadísticas desde el servidor
       await loadTreeStats();
       
-      // Esperar un poco y recargar de nuevo para asegurar actualización
-      setTimeout(async () => {
-        console.log('🔄 [HomeScreen] Segunda recarga de estadísticas...');
-        await loadTreeStats();
-      }, 1000);
-      
-      if (result.synced > 0) {
-        // Mostrar mensaje de éxito
-        alert(`¡Sincronización exitosa! ${result.synced} árboles sincronizados.`);
-      } else if (result.total === 0) {
-        alert('No hay árboles pendientes de sincronizar.');
-      } else {
-        alert(`Sincronización completada con ${result.errors} errores.`);
-      }
+      console.log('✅ [HomeScreen] Datos actualizados exitosamente');
+      alert('¡Datos actualizados desde el servidor!');
       
     } catch (error) {
       console.error('❌ [HomeScreen] Error in manual sync:', error);
@@ -218,17 +210,40 @@ const HomeScreen = ({ navigation }) => {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.greeting}>
-            ¡Hola, {profile?.full_name || user?.email?.split('@')[0] || 'Usuario'}!
+            ¡Hola, {user?.full_name || user?.email?.split('@')[0] || 'Usuario'}!
           </Text>
           <Text style={styles.subtitle}>
-            {profile?.full_name ? profile.full_name : (user?.email || 'Usuario sin email')}
+            {user?.full_name || user?.email || 'Usuario sin email'}
           </Text>
-          {profile?.role && (
+          {user?.role && (
             <Text style={styles.roleText}>
-              {profile.role === 'explorer' ? '🌱 Explorador' : 
-               profile.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
+              {user.role === 'explorer' ? '🌱 Explorador' : 
+               user.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
             </Text>
           )}
+        </View>
+
+        {/* Sección de Puntos de Explorador */}
+        <View style={styles.explorerPointsContainer}>
+          <View style={styles.explorerPointsCard}>
+            <View style={styles.explorerIconContainer}>
+              <Text style={styles.explorerIcon}>🧭</Text>
+            </View>
+            <View style={styles.explorerPointsInfo}>
+              <Text style={styles.explorerPointsTitle}>Puntos de Explorador</Text>
+              <Text style={styles.explorerPointsNumber}>{treeStats.explorerPoints}</Text>
+              <Text style={styles.explorerPointsSubtitle}>
+                {treeStats.flora} árboles × 100 + {treeStats.fauna} animales × 200
+              </Text>
+            </View>
+            <View style={styles.explorerBadge}>
+              <Text style={styles.explorerBadgeText}>
+                {treeStats.explorerPoints >= 1000 ? '🏆 Experto' : 
+                 treeStats.explorerPoints >= 500 ? '🥇 Avanzado' : 
+                 treeStats.explorerPoints >= 200 ? '🥈 Intermedio' : '🥉 Novato'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Indicador de Sincronización */}
@@ -267,7 +282,7 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Estadísticas de la Comunidad */}
         <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>🌍 Registros de la Comunidad</Text>
+          <Text style={styles.sectionTitle}>🌱 Mis Registros Aprobados</Text>
           
           <View style={styles.communityStatsGrid}>
             {/* Flora */}
@@ -279,7 +294,7 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.communityStatEmoji}>🌳</Text>
               </View>
               <Text style={styles.communityStatNumber}>{treeStats.flora || 0}</Text>
-              <Text style={styles.communityStatLabel}>Flora Aprobada</Text>
+              <Text style={styles.communityStatLabel}>Mis Árboles Aprobados</Text>
             </TouchableOpacity>
             
             {/* Fauna */}
@@ -291,7 +306,7 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.communityStatEmoji}>🐾</Text>
               </View>
               <Text style={styles.communityStatNumber}>{treeStats.fauna || 0}</Text>
-              <Text style={styles.communityStatLabel}>Fauna Aprobada</Text>
+              <Text style={styles.communityStatLabel}>Mis Animales Aprobados</Text>
             </TouchableOpacity>
           </View>
           
@@ -305,7 +320,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* Botón especial para científicos y admins */}
-        {(profile?.role === 'scientist' || profile?.role === 'admin') && (
+        {(user?.role === 'scientist' || user?.role === 'admin') && (
           <View style={styles.actionsContainer}>
             <Text style={styles.sectionTitle}>Panel de Revisión</Text>
             <TouchableOpacity 
@@ -376,6 +391,67 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     opacity: 0.9,
+  },
+  explorerPointsContainer: {
+    padding: 15,
+    paddingBottom: 0,
+  },
+  explorerPointsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 8,
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)',
+    borderLeftWidth: 5,
+    borderLeftColor: '#ffd700',
+  },
+  explorerIconContainer: {
+    marginRight: 15,
+  },
+  explorerIcon: {
+    fontSize: 40,
+  },
+  explorerPointsInfo: {
+    flex: 1,
+  },
+  explorerPointsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2d5016',
+    marginBottom: 5,
+  },
+  explorerPointsNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffd700',
+    marginBottom: 3,
+  },
+  explorerPointsSubtitle: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontStyle: 'italic',
+  },
+  explorerBadge: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ffd700',
+  },
+  explorerBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2d5016',
   },
   syncIndicator: {
     backgroundColor: '#fff3cd',

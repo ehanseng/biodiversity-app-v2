@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import SimpleTreeStorage from '../services/SimpleTreeStorage';
 import mySQLService from '../services/MySQLService';
+import SimpleUserService from '../services/SimpleUserService';
 
 const AuthContext = createContext({});
 
@@ -11,34 +12,6 @@ export const useAuth = () => {
   }
   return context;
 };
-
-// Usuarios mock para desarrollo
-const MOCK_USERS = [
-  {
-    id: '1',
-    email: 'explorer@vibo.co',
-    password: 'explorer123',
-    full_name: 'Explorer Usuario',
-    role: 'explorer',
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    email: 'scientist@vibo.co',
-    password: 'scientist123',
-    full_name: 'Científico Usuario',
-    role: 'scientist',
-    created_at: new Date().toISOString()
-  },
-  {
-    id: '3',
-    email: 'admin@vibo.co',
-    password: 'admin123',
-    full_name: 'Admin Usuario',
-    role: 'admin',
-    created_at: new Date().toISOString()
-  }
-];
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -82,8 +55,9 @@ export const AuthProvider = ({ children }) => {
         try {
           console.log('🔐 [AuthContext] Intentando login con:', email);
           
-          // Buscar usuario en la lista de usuarios mock
-          const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
+          // Buscar usuario usando el servicio híbrido (localStorage + MySQL)
+          const userService = new SimpleUserService();
+          const foundUser = await userService.findUser(email, password);
           
           if (!foundUser) {
             throw new Error('Credenciales inválidas');
@@ -122,36 +96,31 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signUp = async (userData) => {
+  const signUp = async (email, password, additionalData = {}) => {
     try {
-      console.log('📝 [AuthContext] Iniciando registro...');
+      console.log('📝 [AuthContext] Iniciando registro para:', email);
       setError(null);
       
       // Simular delay de red
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Verificar si el email ya existe
-      const existingUser = MOCK_USERS.find(u => u.email === userData.email);
-      if (existingUser) {
-        throw new Error('El email ya está registrado');
-      }
-      
-      // Crear nuevo usuario
-      const newUser = {
-        id: Date.now().toString(),
-        email: userData.email,
-        full_name: userData.full_name || userData.email,
-        role: userData.role || 'explorer',
-        created_at: new Date().toISOString()
+      // Preparar datos del usuario
+      const userData = {
+        email,
+        password,
+        full_name: additionalData.full_name || email,
+        role: additionalData.role || 'explorer'
       };
       
-      // Agregar a la lista mock (solo para esta sesión)
-      MOCK_USERS.push({ ...newUser, password: userData.password });
+      console.log('📋 [AuthContext] Datos del usuario a crear:', { ...userData, password: '***' });
       
-      // Guardar en localStorage
+      // Crear usuario usando el servicio híbrido (localStorage + MySQL)
+      const newUser = await hybridUserService.createUser(userData);
+      
+      // Guardar en localStorage para mantener sesión
       localStorage.setItem('biodiversity_user', JSON.stringify(newUser));
       
-      console.log('✅ [AuthContext] Registro exitoso');
+      console.log('✅ [AuthContext] Registro exitoso para:', newUser.email);
       setUser(newUser);
       return { success: true, user: newUser };
       

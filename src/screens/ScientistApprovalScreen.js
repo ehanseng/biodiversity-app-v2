@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 // Supabase removido - usando datos mock
-import { useAuth } from '../contexts/NewAuthContext';
+import { useAuth } from '../contexts/SimpleAuthContext';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import webNotifications from '../utils/WebNotifications';
 
