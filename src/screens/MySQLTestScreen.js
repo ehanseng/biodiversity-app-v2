@@ -7,6 +7,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import mySQLService from '../services/MySQLService';
@@ -16,6 +18,9 @@ const MySQLTestScreen = ({ navigation }) => {
   const [records, setRecords] = useState([]);
   const [stats, setStats] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('unknown');
+  const [currentURL, setCurrentURL] = useState(mySQLService.getCurrentURL());
+  const [showURLConfig, setShowURLConfig] = useState(false);
+  const [newURL, setNewURL] = useState('');
 
   useEffect(() => {
     testConnection();
@@ -26,8 +31,11 @@ const MySQLTestScreen = ({ navigation }) => {
       setLoading(true);
       setConnectionStatus('testing');
       
-      // Probar conexión básica
-      const response = await fetch('http://localhost:3001/api/health');
+      // Probar conexión básica usando la URL actual del servicio
+      const healthURL = `${currentURL.replace('/api', '')}/api/health`;
+      console.log('🔍 Probando conexión a:', healthURL);
+      
+      const response = await fetch(healthURL);
       const data = await response.json();
       
       if (data.status === 'OK') {
@@ -43,6 +51,36 @@ const MySQLTestScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const changeServerURL = () => {
+    if (newURL.trim()) {
+      // Asegurar que la URL termine con /api
+      let formattedURL = newURL.trim();
+      if (!formattedURL.endsWith('/api')) {
+        formattedURL = formattedURL.replace(/\/$/, '') + '/api';
+      }
+      
+      mySQLService.setAPIURL(formattedURL);
+      setCurrentURL(formattedURL);
+      setShowURLConfig(false);
+      setNewURL('');
+      
+      Alert.alert('✅ URL Actualizada', `Servidor cambiado a:\n${formattedURL}`, [
+        { text: 'Probar Conexión', onPress: testConnection }
+      ]);
+    }
+  };
+
+  const resetToLocal = () => {
+    const localURL = 'http://localhost:3001/api';
+    mySQLService.setAPIURL(localURL);
+    setCurrentURL(localURL);
+    setShowURLConfig(false);
+    
+    Alert.alert('🏠 Servidor Local', 'Cambiado a servidor local', [
+      { text: 'Probar Conexión', onPress: testConnection }
+    ]);
   };
 
   const loadRecords = async () => {
@@ -162,6 +200,33 @@ const MySQLTestScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>Prueba MySQL</Text>
       </View>
 
+      {/* Configuración de Servidor */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>⚙️ Configuración de Servidor</Text>
+        <View style={styles.serverCard}>
+          <Text style={styles.serverLabel}>Servidor Actual:</Text>
+          <Text style={styles.serverURL}>{currentURL}</Text>
+          
+          <View style={styles.serverButtons}>
+            <TouchableOpacity 
+              style={[styles.serverButton, { backgroundColor: '#007bff' }]}
+              onPress={() => setShowURLConfig(true)}
+            >
+              <Ionicons name="settings" size={16} color="#ffffff" />
+              <Text style={styles.serverButtonText}>Cambiar Servidor</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.serverButton, { backgroundColor: '#6c757d' }]}
+              onPress={resetToLocal}
+            >
+              <Ionicons name="home" size={16} color="#ffffff" />
+              <Text style={styles.serverButtonText}>Local</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
       {/* Estado de Conexión */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🔗 Estado de Conexión</Text>
@@ -269,6 +334,57 @@ const MySQLTestScreen = ({ navigation }) => {
           <Text style={styles.loadingText}>Procesando...</Text>
         </View>
       )}
+
+      {/* Modal de Configuración de URL */}
+      <Modal
+        visible={showURLConfig}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowURLConfig(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🌐 Configurar Servidor</Text>
+            
+            <Text style={styles.modalLabel}>URL del Servidor:</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newURL}
+              onChangeText={setNewURL}
+              placeholder="https://mi-servidor.com:3001"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            
+            <Text style={styles.modalHint}>
+              💡 Ejemplos:{'\n'}
+              • https://mi-servidor.com:3001{'\n'}
+              • http://192.168.1.100:3001{'\n'}
+              • https://biodiversity-api.herokuapp.com
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#6c757d' }]}
+                onPress={() => {
+                  setShowURLConfig(false);
+                  setNewURL('');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: '#007bff' }]}
+                onPress={changeServerURL}
+              >
+                <Text style={styles.modalButtonText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -404,6 +520,108 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#ffffff',
     marginTop: 10,
+    fontSize: 16,
+  },
+  // Estilos para configuración de servidor
+  serverCard: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  serverLabel: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginBottom: 5,
+  },
+  serverURL: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2d5016',
+    marginBottom: 15,
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 5,
+  },
+  serverButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  serverButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flex: 0.48,
+    justifyContent: 'center',
+  },
+  serverButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    marginLeft: 5,
+    fontSize: 14,
+  },
+  // Estilos para modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 25,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2d5016',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2d5016',
+    marginBottom: 10,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 15,
+    backgroundColor: '#f8f9fa',
+  },
+  modalHint: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 0.48,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
     fontSize: 16,
   },
 });

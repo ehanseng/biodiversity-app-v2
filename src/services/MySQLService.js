@@ -1,8 +1,42 @@
 // Servicio para conectar con la API de MySQL
 class MySQLService {
   constructor() {
-    this.baseURL = 'http://localhost:3001/api';
+    // Configuración dinámica de URL
+    this.baseURL = this.getAPIURL();
     this.token = null;
+    console.log(`🌐 [MySQLService] Configurado para: ${this.baseURL}`);
+  }
+
+  // Determinar URL de API (local o remoto)
+  getAPIURL() {
+    // Prioridad: Variable de entorno > localStorage > Local por defecto
+    const envURL = process.env.REACT_APP_API_URL;
+    const storedURL = localStorage.getItem('@biodiversity_api_url');
+    
+    if (envURL) {
+      console.log('🌐 [MySQLService] Usando URL de variable de entorno');
+      return envURL;
+    }
+    
+    if (storedURL) {
+      console.log('🌐 [MySQLService] Usando URL guardada en localStorage');
+      return storedURL;
+    }
+    
+    console.log('🏠 [MySQLService] Usando URL local por defecto');
+    return 'http://localhost:3001/api';
+  }
+
+  // Cambiar URL de API dinámicamente
+  setAPIURL(newURL) {
+    this.baseURL = newURL;
+    localStorage.setItem('@biodiversity_api_url', newURL);
+    console.log(`🔄 [MySQLService] URL actualizada a: ${newURL}`);
+  }
+
+  // Obtener URL actual
+  getCurrentURL() {
+    return this.baseURL;
   }
 
   // Configurar token de autenticación
