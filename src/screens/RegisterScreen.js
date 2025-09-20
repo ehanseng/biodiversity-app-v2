@@ -10,7 +10,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/NewAuthContext';
 
 const RegisterScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({

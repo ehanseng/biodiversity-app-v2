@@ -10,12 +10,12 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/NewAuthContext';
 import TreeStorageService from '../services/TreeStorageService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
 const HomeScreen = ({ navigation }) => {
-  const { user, profile, syncStats, forceSyncTrees, refreshProfile } = useAuth();
+  const { user, profile, syncStats, forceSyncTrees, refreshProfile, getStats } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [treeStats, setTreeStats] = useState({
     totalTrees: 0,
@@ -78,53 +78,36 @@ const HomeScreen = ({ navigation }) => {
 
   const loadTreeStats = async () => {
     try {
-      console.log('📊 Cargando estadísticas de árboles para usuario:', user?.id);
-      const allTrees = await TreeStorageService.getAllTrees(user?.id);
-      console.log('🌳 Árboles obtenidos:', allTrees.length);
+      console.log('📊 [HomeScreen] Cargando estadísticas usando AuthContext...');
       
-      // Calcular estadísticas usando la lógica simplificada
-      const myTrees = allTrees.filter(tree => 
-        tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit)
-      ).length;
+      // Usar las estadísticas del AuthContext (consistente con Explorer)
+      const stats = await getStats();
       
-      // Todos los árboles aprobados (de cualquier usuario) para "Todos"
-      const totalApprovedTrees = allTrees.filter(tree => 
-        tree.approval_status === 'approved'
-      ).length;
+      if (!stats) {
+        console.log('❌ [HomeScreen] No se pudieron obtener estadísticas');
+        return;
+      }
       
-      // Solo MIS árboles aprobados
-      const myApprovedTrees = allTrees.filter(tree => {
-        const isMine = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
-        return isMine && tree.approval_status === 'approved';
-      }).length;
+      console.log('📊 [HomeScreen] Estadísticas obtenidas:', stats);
       
-      // Solo MIS árboles pendientes
-      const myPendingTrees = allTrees.filter(tree => {
-        const isMine = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
-        return isMine && tree.approval_status === 'pending';
-      }).length;
-      
-      // Solo MIS árboles rechazados
-      const myRejectedTrees = allTrees.filter(tree => {
-        const isMine = tree.user_id === user?.id || (tree.source === 'local' && tree.canEdit);
-        return isMine && tree.approval_status === 'rejected';
-      }).length;
-      
-      // Árboles locales (no enviados al servidor)
-      const localTrees = allTrees.filter(tree => 
-        tree.source === 'local'
-      ).length;
-
+      // Usar las estadísticas calculadas por AuthContext
       const newStats = {
-        totalTrees: totalApprovedTrees, // Solo árboles aprobados en "Todos"
-        myTrees: myTrees,
-        approvedTrees: myApprovedTrees, // Solo mis árboles aprobados
-        pendingTrees: myPendingTrees, // Solo mis árboles pendientes
-        rejectedTrees: myRejectedTrees, // Solo mis árboles rechazados
-        localTrees: localTrees,
+        totalTrees: stats.total_trees,
+        myTrees: stats.total_trees,
+        approvedTrees: stats.approved_trees,
+        pendingTrees: stats.pending_trees,
+        rejectedTrees: stats.rejected_trees,
+        localTrees: stats.local_trees || 0,
+        // Estadísticas por tipo
+        floraCount: stats.flora_count || 0,
+        faunaCount: stats.fauna_count || 0,
+        floraApproved: stats.flora_approved || 0,
+        faunaApproved: stats.fauna_approved || 0,
+        floraPending: stats.flora_pending || 0,
+        faunaPending: stats.fauna_pending || 0,
       };
 
-      console.log('📈 Estadísticas calculadas:', newStats);
+      console.log('📈 [HomeScreen] Estadísticas aplicadas:', newStats);
       setTreeStats(newStats);
     } catch (error) {
       console.error('❌ Error loading tree stats:', error);
@@ -280,6 +263,23 @@ const HomeScreen = ({ navigation }) => {
                 >
                   <Text style={styles.statNumber}>{treeStats.rejectedTrees}</Text>
                   <Text style={styles.statLabel}>Mis Rechazados</Text>
+                </TouchableOpacity>
+                
+                {/* Separación por Flora y Fauna */}
+                <TouchableOpacity 
+                  style={[styles.statCard, { borderLeftColor: '#228B22' }]}
+                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'mine' })}
+                >
+                  <Text style={styles.statNumber}>{treeStats.floraCount}</Text>
+                  <Text style={styles.statLabel}>🌳 Mi Flora</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.statCard, { borderLeftColor: '#FF6B6B' }]}
+                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'mine' })}
+                >
+                  <Text style={styles.statNumber}>{treeStats.faunaCount}</Text>
+                  <Text style={styles.statLabel}>🦋 Mi Fauna</Text>
                 </TouchableOpacity>
                 
                 {treeStats.localTrees > 0 && (

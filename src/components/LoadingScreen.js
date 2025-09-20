@@ -8,8 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
-import { clearCorruptedSession } from '../config/supabase';
+import { useAuth } from '../contexts/NewAuthContext';
 
 const LoadingScreen = () => {
   const { error, retryInitialization } = useAuth();
@@ -26,9 +25,9 @@ const LoadingScreen = () => {
           onPress: async () => {
             try {
               console.log('🧹 Limpiando datos desde LoadingScreen...');
-              await clearCorruptedSession();
-              // Recargar página para reinicio completo
+              // Limpiar localStorage
               if (typeof window !== 'undefined') {
+                localStorage.removeItem('biodiversity_user');
                 window.location.reload();
               }
             } catch (error) {

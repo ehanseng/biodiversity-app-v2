@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/AuthContext';
+// Supabase removido - usando datos mock
+import { useAuth } from '../contexts/NewAuthContext';
 
 const DashboardScreen = ({ navigation }) => {
   const { user, profile } = useAuth();
@@ -24,27 +24,19 @@ const DashboardScreen = ({ navigation }) => {
 
   const fetchStats = async () => {
     try {
-      // Fetch trees stats
-      const { data: allTrees } = await supabase.from('trees').select('*');
-      const { data: approvedTrees } = await supabase.from('trees').select('*').eq('status', 'approved');
-      const { data: pendingTrees } = await supabase.from('trees').select('*').eq('status', 'pending');
-      const { data: userTrees } = await supabase.from('trees').select('*').eq('user_id', user.id);
-
-      // Fetch animals stats
-      const { data: allAnimals } = await supabase.from('animals').select('*');
-      const { data: approvedAnimals } = await supabase.from('animals').select('*').eq('status', 'approved');
-      const { data: pendingAnimals } = await supabase.from('animals').select('*').eq('status', 'pending');
-      const { data: userAnimals } = await supabase.from('animals').select('*').eq('user_id', user.id);
-
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Estadísticas mock
       setStats({
-        totalTrees: allTrees?.length || 0,
-        totalAnimals: allAnimals?.length || 0,
-        approvedTrees: approvedTrees?.length || 0,
-        approvedAnimals: approvedAnimals?.length || 0,
-        pendingTrees: pendingTrees?.length || 0,
-        pendingAnimals: pendingAnimals?.length || 0,
-        userTrees: userTrees?.length || 0,
-        userAnimals: userAnimals?.length || 0,
+        totalTrees: 15,
+        totalAnimals: 8,
+        approvedTrees: 12,
+        approvedAnimals: 6,
+        pendingTrees: 3,
+        pendingAnimals: 2,
+        userTrees: 5,
+        userAnimals: 3,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);

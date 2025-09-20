@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { supabase, clearCorruptedSession } from '../config/supabase';
-import TreeStorageService from '../services/TreeStorageService';
+import backendService from '../services/BackendService';
+// import { supabase } from '../config/supabase'; // Comentado - ya no usamos Supabase
+// import TreeStorageService from '../services/TreeStorageService'; // Comentado - usaremos el nuevo backend
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
 const AuthContext = createContext({});

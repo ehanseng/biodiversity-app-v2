@@ -11,8 +11,8 @@ import {
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/AuthContext';
+// Supabase removido - usando datos mock
+import { useAuth } from '../contexts/NewAuthContext';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import webNotifications from '../utils/WebNotifications';
 
@@ -38,19 +38,43 @@ const ScientistApprovalScreen = ({ navigation }) => {
   const loadTrees = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('trees')
-        .select(`
-          *,
-          profiles!trees_user_id_fkey (
-            full_name,
-            email
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAllTrees(data || []);
+      
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Datos mock de árboles para aprobación
+      const mockTrees = [
+        {
+          id: 1,
+          common_name: 'Ceiba',
+          scientific_name: 'Ceiba pentandra',
+          height_meters: 25,
+          diameter_cm: 80,
+          status: 'pending',
+          user_id: '1',
+          created_at: new Date().toISOString(),
+          profiles: {
+            full_name: 'Explorer Usuario',
+            email: 'explorer@vibo.co'
+          }
+        },
+        {
+          id: 2,
+          common_name: 'Guayacán',
+          scientific_name: 'Tabebuia chrysantha',
+          height_meters: 15,
+          diameter_cm: 45,
+          status: 'approved',
+          user_id: '1',
+          created_at: new Date().toISOString(),
+          profiles: {
+            full_name: 'Explorer Usuario',
+            email: 'explorer@vibo.co'
+          }
+        }
+      ];
+      
+      setAllTrees(mockTrees);
     } catch (error) {
       console.error('Error loading trees:', error);
       Alert.alert('Error', 'No se pudieron cargar los árboles');

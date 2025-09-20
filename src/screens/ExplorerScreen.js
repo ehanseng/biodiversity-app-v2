@@ -9,9 +9,10 @@ import {
   Alert,
   Animated,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/NewAuthContext';
 import TreeStorageService from '../services/TreeStorageService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
@@ -35,8 +36,9 @@ const ExplorerScreen = ({ navigation, route }) => {
   }, [route?.params?.initialFilter]);
 
   useEffect(() => {
-    const unsubscribeTreeCreated = eventEmitter.on(EVENTS.TREE_CREATED, () => {
-      console.log(' [ExplorerScreen] Árbol creado, actualizando lista...');
+    const unsubscribeTreeCreated = eventEmitter.on(EVENTS.TREE_CREATED, (newTree) => {
+      console.log('📨 [ExplorerScreen] Evento TREE_CREATED recibido:', newTree);
+      console.log('🔄 [ExplorerScreen] Actualizando lista de árboles...');
       loadTrees();
     });
 
@@ -94,32 +96,54 @@ const ExplorerScreen = ({ navigation, route }) => {
   const getFilteredTrees = () => {
     switch (filter) {
       case 'mine':
+        // TODOS mis árboles (míos y locales), sin importar el estado
         return trees.filter(tree => 
           tree.user_id === user.id || 
           (tree.source === 'local' && tree.canEdit)
         );
       case 'approved':
+        // SOLO MIS árboles aprobados
         return trees.filter(tree => {
-          const isOwn = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-          return isOwn && tree.approval_status === 'approved';
+          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+          return isMine && (
+            (tree.status === 'approved') || 
+            (tree.approval_status === 'approved') ||
+            (tree.syncStatus === 'approved')
+          );
         });
       case 'pending':
+        // SOLO MIS árboles pendientes de aprobación (ya están en el servidor)
         return trees.filter(tree => {
-          const isOwn = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-          return isOwn && tree.approval_status === 'pending';
+          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+          return isMine && (
+            (tree.status === 'pending') || 
+            (tree.approval_status === 'pending')
+          ) && tree.source !== 'local'; // Excluir árboles locales
         });
       case 'rejected':
+        // SOLO MIS árboles rechazados (ya están en el servidor)
         return trees.filter(tree => {
-          const isOwn = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-          return isOwn && tree.approval_status === 'rejected';
+          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+          return isMine && (
+            (tree.status === 'rejected') || 
+            (tree.approval_status === 'rejected')
+          ) && tree.source !== 'local'; // Excluir árboles locales
         });
       case 'local':
-        return trees.filter(tree => 
-          tree.source === 'local'
-        );
+        // SOLO MIS árboles que NO se han podido subir (falta de internet)
+        return trees.filter(tree => {
+          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+          return isMine && (
+            tree.source === 'local' || 
+            tree.syncStatus === 'error' // Solo errores de sincronización, no pendientes
+          );
+        });
       default: // 'all'
+        // SOLO árboles aprobados de TODOS los usuarios (míos y de otros)
         return trees.filter(tree => 
-          tree.approval_status === 'approved'
+          (tree.status === 'approved') || 
+          (tree.approval_status === 'approved') ||
+          (tree.syncStatus === 'approved')
         );
     }
   };
@@ -145,12 +169,14 @@ const ExplorerScreen = ({ navigation, route }) => {
   const getStatusText = (tree) => {
     if (tree.source === 'local') {
       return '📱 Local';
+    } else if (tree.syncStatus === 'error') {
+      return '🚫 Error Subida';
     } else {
       switch (tree.approval_status || tree.status) {
         case 'approved': return '✅ Aprobado';
-        case 'pending': return '⏳ Pendiente';
+        case 'pending': return '⏳ Pendiente Aprobación';
         case 'rejected': return '❌ Rechazado';
-        default: return '⏳ Pendiente';
+        default: return '⏳ Pendiente Aprobación';
       }
     }
   };
@@ -205,60 +231,113 @@ ${tree.description || ''}`,
     const isOwn = canEditTree(tree);
     const creatorName = tree.profiles?.full_name || tree.createdBy || 'Usuario';
     
+    // Debug: Log de imagen
+    if (tree.image_url) {
+      console.log('🖼️ [ExplorerScreen] Imagen para', tree.common_name, ':', tree.image_url?.substring(0, 50) + '...');
+    }
+    
     return (
       <TouchableOpacity
         style={[styles.treeCard, isOwn && styles.ownTreeCard]}
         onPress={() => handleTreePress(tree)}
       >
-        <View style={styles.treeHeader}>
-          <View style={styles.treeInfo}>
-            <Text style={styles.treeName}>{tree.common_name}</Text>
-            {tree.scientific_name && (
-              <Text style={styles.scientificName}>{tree.scientific_name}</Text>
-            )}
-          </View>
-          
-          <View style={styles.treeActions}>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(tree) }]}>
-              <Text style={styles.statusText}>{getStatusText(tree)}</Text>
+        <View style={styles.treeCardContent}>
+          {/* Imagen del registro */}
+          <View style={styles.treeImageContainer}>
+            <Image
+              source={{ 
+                uri: tree.image_url || (tree.type === 'fauna' 
+                  ? 'https://picsum.photos/120/120?random=' + tree.id + '&blur=1'
+                  : 'https://picsum.photos/120/120?random=' + tree.id)
+              }}
+              style={styles.treeImage}
+              resizeMode="cover"
+              onError={(error) => {
+                console.log('❌ [ExplorerScreen] Error cargando imagen para', tree.common_name, ':', error.nativeEvent.error);
+              }}
+              onLoad={() => {
+                console.log('✅ [ExplorerScreen] Imagen cargada exitosamente para', tree.common_name);
+              }}
+            />
+            {/* Icono indicador de tipo */}
+            <View style={[styles.typeIndicator, { backgroundColor: tree.type === 'fauna' ? '#FF6B6B' : '#228B22' }]}>
+              <Text style={styles.typeIcon}>
+                {tree.type === 'fauna' ? '🦋' : '🌳'}
+              </Text>
             </View>
-            
-            {isOwn ? (
-              <Ionicons name="create-outline" size={20} color="#007bff" />
-            ) : (
-              <Ionicons name="eye-outline" size={20} color="#6c757d" />
+          </View>
+          
+          {/* Contenido del árbol */}
+          <View style={styles.treeContent}>
+            <View style={styles.treeHeader}>
+              <View style={styles.treeInfo}>
+                <Text style={styles.treeName}>{tree.common_name}</Text>
+                {tree.scientific_name && (
+                  <Text style={styles.scientificName}>{tree.scientific_name}</Text>
+                )}
+              </View>
+              
+              <View style={styles.treeActions}>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(tree) }]}>
+                  <Text style={styles.statusText}>{getStatusText(tree)}</Text>
+                </View>
+                
+                {isOwn ? (
+                  <Ionicons name="create-outline" size={20} color="#007bff" />
+                ) : (
+                  <Ionicons name="eye-outline" size={20} color="#6c757d" />
+                )}
+              </View>
+            </View>
+
+            <View style={styles.treeDetails}>
+              <View style={styles.detailRow}>
+                <Ionicons name="location-outline" size={16} color="#6c757d" />
+                <Text style={styles.detailText}>
+                  {tree.location_description || tree.habitat || 'Ubicación no especificada'}
+                </Text>
+              </View>
+              
+              {tree.type === 'fauna' && tree.animal_class && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="paw-outline" size={16} color="#6c757d" />
+                  <Text style={styles.detailText}>
+                    {tree.animal_class}
+                  </Text>
+                </View>
+              )}
+              
+              {tree.type === 'flora' && (tree.height_meters || tree.diameter_cm) && (
+                <View style={styles.detailRow}>
+                  <Ionicons name="resize-outline" size={16} color="#6c757d" />
+                  <Text style={styles.detailText}>
+                    {tree.height_meters ? `${tree.height_meters}m` : ''} {tree.diameter_cm ? `⌀${tree.diameter_cm}cm` : ''}
+                  </Text>
+                </View>
+              )}
+              
+              <View style={styles.detailRow}>
+                <Ionicons name="person-outline" size={16} color="#6c757d" />
+                <Text style={styles.detailText}>
+                  {isOwn ? 'Tuyo' : `Por ${creatorName}`}
+                </Text>
+              </View>
+              
+              <View style={styles.detailRow}>
+                <Ionicons name="calendar-outline" size={16} color="#6c757d" />
+                <Text style={styles.detailText}>
+                  {new Date(tree.created_at || tree.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+
+            {tree.description && (
+              <Text style={styles.description} numberOfLines={2}>
+                {tree.description}
+              </Text>
             )}
           </View>
         </View>
-
-        <View style={styles.treeDetails}>
-          <View style={styles.detailRow}>
-            <Ionicons name="location-outline" size={16} color="#6c757d" />
-            <Text style={styles.detailText}>
-              {tree.location_description || 'Ubicación no especificada'}
-            </Text>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <Ionicons name="person-outline" size={16} color="#6c757d" />
-            <Text style={styles.detailText}>
-              {isOwn ? 'Tuyo' : `Por ${creatorName}`}
-            </Text>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <Ionicons name="calendar-outline" size={16} color="#6c757d" />
-            <Text style={styles.detailText}>
-              {new Date(tree.created_at || tree.createdAt).toLocaleDateString()}
-            </Text>
-          </View>
-        </View>
-
-        {tree.description && (
-          <Text style={styles.description} numberOfLines={2}>
-            {tree.description}
-          </Text>
-        )}
       </TouchableOpacity>
     );
   };
@@ -275,35 +354,50 @@ ${tree.description || ''}`,
   );
 
   const filteredTrees = getFilteredTrees();
-  const myTreesCount = trees.filter(tree => canEditTree(tree)).length;
   
-  // Contar solo MIS árboles aprobados
-  const approvedCount = trees.filter(tree => {
-    const isOwn = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-    return isOwn && tree.approval_status === 'approved';
-  }).length;
-  
-  // Contar solo MIS árboles pendientes
-  const pendingCount = trees.filter(tree => {
-    const isOwn = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-    return isOwn && tree.approval_status === 'pending';
-  }).length;
-  
-  // Contar árboles locales (no enviados al servidor)
-  const localCount = trees.filter(tree => 
-    tree.source === 'local'
-  ).length;
-  
-  // Contar solo MIS árboles rechazados
-  const rejectedCount = trees.filter(tree => {
-    const isOwn = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-    return isOwn && tree.approval_status === 'rejected';
-  }).length;
-  
-  // Contador para "Todos" - solo árboles aprobados de cualquier usuario
+  // Contadores para cada filtro
   const allCount = trees.filter(tree => 
-    tree.approval_status === 'approved'
-  ).length;
+    (tree.status === 'approved') || 
+    (tree.approval_status === 'approved') ||
+    (tree.syncStatus === 'approved')
+  ).length; // SOLO árboles aprobados de TODOS los usuarios
+  
+  const myTreesCount = trees.filter(tree => 
+    tree.user_id === user.id || (tree.source === 'local' && tree.canEdit)
+  ).length; // TODOS mis árboles
+  
+  const approvedCount = trees.filter(tree => {
+    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+    return isMine && (
+      (tree.status === 'approved') || 
+      (tree.approval_status === 'approved') ||
+      (tree.syncStatus === 'approved')
+    );
+  }).length; // SOLO MIS árboles aprobados
+  
+  const pendingCount = trees.filter(tree => {
+    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+    return isMine && (
+      (tree.status === 'pending') || 
+      (tree.approval_status === 'pending')
+    ) && tree.source !== 'local'; // Solo árboles en servidor esperando aprobación
+  }).length; // SOLO MIS árboles pendientes de aprobación
+  
+  const rejectedCount = trees.filter(tree => {
+    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+    return isMine && (
+      (tree.status === 'rejected') || 
+      (tree.approval_status === 'rejected')
+    ) && tree.source !== 'local'; // Solo árboles en servidor rechazados
+  }).length; // SOLO MIS árboles rechazados
+  
+  const localCount = trees.filter(tree => {
+    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
+    return isMine && (
+      tree.source === 'local' || 
+      tree.syncStatus === 'error' // Solo errores de subida, no pendientes
+    );
+  }).length; // SOLO MIS árboles que no se han podido subir
 
   const toggleFabMenu = () => {
     const toValue = fabOpen ? 0 : 1;
@@ -319,10 +413,8 @@ ${tree.description || ''}`,
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explorador de Árboles</Text>
-        <Text style={styles.headerSubtitle}>
-          {filteredTrees.length} árboles encontrados
-        </Text>
+        <Text style={styles.headerTitle}>Explorador de Biodiversidad</Text>
+        <Text style={styles.headerSubtitle}>{trees.length} registros encontrados</Text>
       </View>
 
       {/* Filtros */}
@@ -551,6 +643,37 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  treeCardContent: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  treeImageContainer: {
+    marginRight: 12,
+  },
+  treeImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+  },
+  treeContent: {
+    flex: 1,
+  },
+  typeIndicator: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  typeIcon: {
+    fontSize: 12,
   },
   fabContainer: {
     position: 'absolute',

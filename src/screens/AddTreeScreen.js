@@ -3,9 +3,9 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import TreeStorageService from '../services/TreeStorageService';
+// Supabase removido - usando sistema simple
+import { useAuth } from '../contexts/NewAuthContext';
+import newTreeService from '../services/NewTreeService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -228,32 +228,34 @@ const AddTreeScreen = ({ navigation }) => {
 
   const uploadImage = async (uri) => {
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const fileExt = uri.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      showNotification('Subiendo imagen...', '', 'info');
-
-      let { error: uploadError } = await supabase.storage
-        .from('trees-images') // Nombre de tu bucket en Supabase Storage
-        .upload(filePath, blob, {
-          contentType: `image/${fileExt}`,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Obtener la URL pública
-      const { data } = supabase.storage.from('trees-images').getPublicUrl(filePath);
-      console.log('✅ Imagen subida, URL pública:', data.publicUrl);
-      return data.publicUrl;
+      console.log('🚀 [AddTreeScreen] Simulando subida de imagen:', uri);
+      
+      // Simular delay de subida
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Generar URL mock para la imagen
+      const fileName = `tree_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const mockUrl = `https://mock-storage.example.com/trees/${fileName}`;
+      
+      console.log('✅ [AddTreeScreen] Imagen "subida" exitosamente (mock):', mockUrl);
+      showNotification('✅ Imagen procesada exitosamente', '', 'success');
+      
+      return mockUrl;
 
     } catch (error) {
-      console.error('❌ Error al subir la imagen:', error);
-      showError('Error al subir la imagen');
+      console.error('❌ [AddTreeScreen] Error completo al subir imagen:', error);
+      
+      // Mostrar error específico al usuario
+      let userMessage = 'Error al subir la imagen';
+      if (error.message?.includes('almacenamiento')) {
+        userMessage = 'Problema con el almacenamiento de imágenes';
+      } else if (error.message?.includes('conexión') || error.message?.includes('network')) {
+        userMessage = 'Problema de conexión. Verifica tu internet';
+      } else if (error.message?.includes('bucket') || error.message?.includes('Bucket')) {
+        userMessage = 'Servicio de imágenes no disponible temporalmente';
+      }
+      
+      showError(`${userMessage}: ${error.message}`);
       return null;
     }
   };
@@ -276,123 +278,54 @@ const AddTreeScreen = ({ navigation }) => {
     console.log('🚀 [AddTreeScreen] Iniciando guardado...');
     
     try {
-      let imageUrl = null;
-      // Si hay una imagen seleccionada, subirla primero
-      if (image) {
-        imageUrl = await uploadImage(image);
-        if (!imageUrl) {
-          setLoading(false);
-          return; // Detener si la subida de imagen falla
-        }
-      }
-
+      // Preparar datos del árbol
       const treeData = {
-        user_id: user.id,
         common_name: formData.common_name.trim(),
         scientific_name: formData.scientific_name.trim() || null,
         description: formData.description.trim() || null,
         latitude: formData.latitude ? parseFloat(formData.latitude) : null,
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         location_description: formData.location_description.trim() || null,
-        height: formData.height_meters ? parseFloat(formData.height_meters) : null,
-        diameter: formData.diameter_cm ? parseFloat(formData.diameter_cm) : null,
+        height_meters: formData.height_meters ? parseFloat(formData.height_meters) : null,
+        diameter_cm: formData.diameter_cm ? parseFloat(formData.diameter_cm) : null,
         health_status: formData.health_status.trim() || null,
-        image_url: imageUrl,
       };
 
       console.log('🚀 [AddTreeScreen] TreeData preparado:', treeData);
-
-      // 1. SIEMPRE guardar localmente primero
-      console.log('🚀 [AddTreeScreen] Guardando localmente...');
-      const localTree = await TreeStorageService.saveTreeLocally(treeData);
-      console.log('✅ [AddTreeScreen] Árbol guardado localmente:', localTree);
       
-      // Emitir evento de árbol creado localmente
-      eventEmitter.emit(EVENTS.TREE_CREATED, { 
-        tree: localTree, 
-        type: 'local' 
-      });
+      // Usar el nuevo servicio que maneja imagen y datos juntos
+      const result = await newTreeService.createTree(treeData, image);
       
-      // 2. Intentar sincronizar con la base de datos
-      try {
-        console.log('🚀 [AddTreeScreen] Sincronizando con BD...');
-        const syncedTree = await TreeStorageService.syncTreeToDatabase(localTree, user.id);
-        console.log('✅ [AddTreeScreen] Árbol sincronizado con BD');
+      if (result.success) {
+        console.log('✅ [AddTreeScreen] Árbol creado exitosamente:', result);
+        showSuccess('¡Árbol registrado exitosamente!');
         
-        // Emitir evento de sincronización exitosa
-        eventEmitter.emit(EVENTS.TREES_SYNCED, { 
-          localTree, 
-          syncedTree,
-          type: 'sync_success'
+        // Emitir evento para actualizar listas
+        console.log('📡 [AddTreeScreen] Emitiendo evento TREE_CREATED:', result.tree);
+        eventEmitter.emit(EVENTS.TREE_CREATED, result.tree);
+        console.log('📡 [AddTreeScreen] Evento TREE_CREATED emitido');
+        
+        // Limpiar formulario
+        setFormData({
+          common_name: '',
+          scientific_name: '',
+          description: '',
+          latitude: '',
+          longitude: '',
+          location_description: '',
+          height_meters: '',
+          diameter_cm: '',
+          health_status: '',
         });
+        setImage(null);
         
-        // Mostrar notificación de éxito
-        showNotification(
-          '🎉 ¡Árbol registrado!',
-          `Tu árbol "${formData.common_name}" se ha guardado exitosamente y será revisado por científicos.`,
-          'success'
-        );
-        
-        // Limpiar formulario y scroll hacia arriba automáticamente
+        // Navegar de vuelta
         setTimeout(() => {
-          clearFormAndScrollUp();
-        }, 1000);
-        
-        Alert.alert(
-          '🎉 ¡Gracias por tu aporte!',
-          `Tu árbol "${formData.common_name}" se ha registrado exitosamente y será revisado por nuestros científicos.\n\n¡Cada árbol que registras ayuda a conservar la biodiversidad! 🌱`,
-          [
-            { 
-              text: '🌳 Registrar Otro', 
-              onPress: () => {
-                console.log('🚀 [AddTreeScreen] Usuario quiere registrar otro árbol');
-                // Ya está limpio, solo necesitamos scroll
-                scrollToTop();
-              }
-            },
-            { 
-              text: '📋 Ver en Explorer', 
-              onPress: () => {
-                navigateToExplorer();
-              }
-            }
-          ]
-        );
-      } catch (syncError) {
-        console.log('⚠️ [AddTreeScreen] Error de sincronización, pero guardado localmente:', syncError);
-        
-        // Mostrar notificación de guardado local
-        showNotification(
-          '📱 Árbol guardado localmente',
-          `Tu árbol "${formData.common_name}" se sincronizará automáticamente cuando tengas conexión.`,
-          'warning'
-        );
-
-        // Limpiar formulario y scroll hacia arriba automáticamente
-        setTimeout(() => {
-          clearFormAndScrollUp();
-        }, 1000);
-        
-        Alert.alert(
-          '🎉 ¡Gracias por tu aporte!',
-          `Tu árbol "${formData.common_name}" se ha guardado en tu dispositivo y se sincronizará automáticamente cuando tengas conexión.\n\n¡Cada árbol que registras ayuda a conservar la biodiversidad! 🌱`,
-          [
-            { 
-              text: '🌳 Registrar Otro', 
-              onPress: () => {
-                console.log('🚀 [AddTreeScreen] Usuario quiere registrar otro árbol');
-                // Ya está limpio, solo necesitamos scroll
-                scrollToTop();
-              }
-            },
-            { 
-              text: '📋 Ver en Explorer', 
-              onPress: () => {
-                navigateToExplorer();
-              }
-            }
-          ]
-        );
+          navigation.goBack();
+        }, 1500);
+      } else {
+        console.error('❌ [AddTreeScreen] Error creando árbol:', result.error);
+        showError(`Error al registrar árbol: ${result.error}`);
       }
 
     } catch (error) {
@@ -438,7 +371,7 @@ const AddTreeScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.title}> Registrar Árbol</Text>
+        <Text style={styles.title}>Registrar Árbol</Text>
       </View>
 
       <View style={styles.form}>

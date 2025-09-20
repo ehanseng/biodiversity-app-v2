@@ -7,7 +7,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/NewAuthContext';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, profile, signOut, refreshProfile } = useAuth();

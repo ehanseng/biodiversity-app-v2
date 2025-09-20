@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../config/supabase';
+// Supabase removido - usando datos mock
 
 const MapScreen = () => {
   const [trees, setTrees] = useState([]);
@@ -26,36 +26,43 @@ const MapScreen = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch approved trees
-      const { data: treesData, error: treesError } = await supabase
-        .from('trees')
-        .select('*')
-        .eq('approval_status', 'approved')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
-
-      // Fetch approved animals (if table exists)
-      let animalsData = [];
-      try {
-        const { data: animalsResult, error: animalsError } = await supabase
-          .from('animals')
-          .select('*')
-          .eq('approval_status', 'approved')
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null);
-        
-        if (!animalsError) {
-          animalsData = animalsResult || [];
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Datos mock para árboles
+      const mockTrees = [
+        {
+          id: 1,
+          common_name: 'Ceiba',
+          scientific_name: 'Ceiba pentandra',
+          latitude: 4.6097,
+          longitude: -74.0817,
+          approval_status: 'approved'
+        },
+        {
+          id: 2,
+          common_name: 'Guayacán',
+          scientific_name: 'Tabebuia chrysantha',
+          latitude: 4.6100,
+          longitude: -74.0820,
+          approval_status: 'approved'
         }
-      } catch (animalsError) {
-        console.log('Animals table not available:', animalsError);
-        // Ignore animals error - table might not exist yet
-      }
+      ];
 
-      if (treesError) throw treesError;
+      // Datos mock para animales
+      const mockAnimals = [
+        {
+          id: 1,
+          common_name: 'Colibrí',
+          scientific_name: 'Trochilidae',
+          latitude: 4.6095,
+          longitude: -74.0815,
+          approval_status: 'approved'
+        }
+      ];
 
-      setTrees(treesData || []);
-      setAnimals(animalsData);
+      setTrees(mockTrees);
+      setAnimals(mockAnimals);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {

@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/AuthContext';
+// Supabase removido - usando sistema simple
+import { useAuth } from '../contexts/NewAuthContext';
 import DynamicMapView from '../components/DynamicMapView';
 
 const AddAnimalScreen = ({ navigation }) => {
