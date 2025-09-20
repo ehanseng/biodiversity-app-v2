@@ -46,7 +46,13 @@ class MySQLService {
 
   // Método genérico para hacer requests
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+    // Si la baseURL ya termina en .php, usar parámetros GET
+    let url;
+    if (this.baseURL.endsWith('.php')) {
+      url = `${this.baseURL}?endpoint=${endpoint.replace('/', '')}`;
+    } else {
+      url = `${this.baseURL}${endpoint}`;
+    }
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -137,18 +143,18 @@ class MySQLService {
     });
   }
 
+  // Obtener estadísticas
   async getStats(userId = null) {
-    const params = userId ? `?user_id=${userId}` : '';
-    return await this.request(`/records/stats/summary${params}`);
+    return await this.request('/stats');
+  }
+
+  async getUser(id) {
+    return await this.request(`/users/${id}`);
   }
 
   // === USUARIOS ===
   async getUsers() {
     return await this.request('/users');
-  }
-
-  async getUser(id) {
-    return await this.request(`/users/${id}`);
   }
 
   // === MÉTODOS DE COMPATIBILIDAD CON LOCALSTORAGE ===

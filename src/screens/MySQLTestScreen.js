@@ -32,7 +32,12 @@ const MySQLTestScreen = ({ navigation }) => {
       setConnectionStatus('testing');
       
       // Probar conexión básica usando la URL actual del servicio
-      const healthURL = `${currentURL.replace('/api', '')}/api/health`;
+      let healthURL;
+      if (currentURL.endsWith('.php')) {
+        healthURL = `${currentURL}?endpoint=health`;
+      } else {
+        healthURL = `${currentURL.replace('/api', '')}/api/health`;
+      }
       console.log('🔍 Probando conexión a:', healthURL);
       
       const response = await fetch(healthURL);

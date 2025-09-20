@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/NewAuthContext';
+import hybridTreeService from '../services/HybridTreeService';
 import TreeStorageService from '../services/TreeStorageService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
@@ -30,31 +31,43 @@ const HomeScreen = ({ navigation }) => {
   const animation = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
-    loadTreeStats();
-  }, [syncStats]);
+    console.log('🏠 [HomeScreen] Componente montado, iniciando sincronización automática...');
+    
+    // Ejecutar sincronización automática al cargar
+    const initializeApp = async () => {
+      try {
+        // 1. Sincronización automática (limpia y marca como sincronizados)
+        const autoSyncResult = await hybridTreeService.autoSync();
+        console.log('🔄 [HomeScreen] Auto-sync resultado:', autoSyncResult);
+        
+        // 2. Cargar estadísticas actualizadas
+        await loadTreeStats();
+        
+        // 3. Refrescar perfil
+        await refreshProfile();
+        
+      } catch (error) {
+        console.error('❌ [HomeScreen] Error en inicialización:', error);
+        // Si falla, al menos cargar estadísticas básicas
+        await loadTreeStats();
+      }
+    };
+    
+    initializeApp();
 
-  // Cargar stats cuando el usuario esté disponible
-  useEffect(() => {
-    if (user?.id) {
-      console.log('👤 Usuario disponible, cargando stats iniciales...');
-      loadTreeStats();
-    }
-  }, [user?.id]);
-
-  // Escuchar eventos de cambios en árboles
-  useEffect(() => {
+    // Escuchar eventos de actualización
     const unsubscribeTreeCreated = eventEmitter.on(EVENTS.TREE_CREATED, () => {
-      console.log(' [HomeScreen] Árbol creado, actualizando stats...');
+      console.log('🌳 [HomeScreen] Árbol creado, actualizando stats...');
       loadTreeStats();
     });
 
     const unsubscribeTreesSynced = eventEmitter.on(EVENTS.TREES_SYNCED, () => {
-      console.log(' [HomeScreen] Árboles sincronizados, actualizando stats...');
+      console.log('🔄 [HomeScreen] Árboles sincronizados, actualizando stats...');
       loadTreeStats();
     });
 
-    const unsubscribeDataRefresh = eventEmitter.on(EVENTS.DATA_REFRESH_NEEDED, () => {
-      console.log(' [HomeScreen] Actualización solicitada, recargando stats...');
+    const unsubscribeDataRefresh = eventEmitter.on(EVENTS.DATA_REFRESH, () => {
+      console.log('🔄 [HomeScreen] Datos actualizados, recargando stats...');
       loadTreeStats();
     });
 
@@ -68,9 +81,10 @@ const HomeScreen = ({ navigation }) => {
 
   // También escuchar cuando la pantalla recibe focus
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      console.log(' [HomeScreen] Pantalla enfocada, actualizando stats...');
-      loadTreeStats();
+    const unsubscribe = navigation.addListener('focus', async () => {
+      console.log('🔄 [HomeScreen] Pantalla enfocada, ejecutando auto-sync...');
+      await hybridTreeService.autoSync();
+      await loadTreeStats();
     });
 
     return unsubscribe;
@@ -78,26 +92,53 @@ const HomeScreen = ({ navigation }) => {
 
   const loadTreeStats = async () => {
     try {
-      console.log('📊 [HomeScreen] Cargando estadísticas usando AuthContext...');
+      console.log('📊 [HomeScreen] Cargando estadísticas usando HybridTreeService...');
       
-      // Usar las estadísticas del AuthContext (consistente con Explorer)
+      // Obtener árboles locales pendientes de sincronizar
+      const localTrees = await TreeStorageService.getLocalTrees();
+      const pendingLocalTrees = localTrees.filter(tree => 
+        !tree.mysql_id && // No tiene ID de MySQL
+        (tree.syncStatus !== 'synced') && // No está marcado como sincronizado
+        tree.common_name && // Tiene nombre
+        tree.latitude && tree.longitude && // Tiene coordenadas
+        !isNaN(parseFloat(tree.latitude)) && !isNaN(parseFloat(tree.longitude)) // Coordenadas válidas
+      );
+      
+      console.log(`📊 [HomeScreen] Árboles locales pendientes: ${pendingLocalTrees.length}`);
+      
+      // Usar las estadísticas del AuthContext para el resto
       const stats = await getStats();
       
       if (!stats) {
-        console.log('❌ [HomeScreen] No se pudieron obtener estadísticas');
+        console.log('❌ [HomeScreen] No se pudieron obtener estadísticas del servidor');
+        // Solo mostrar estadísticas locales
+        setTreeStats({
+          totalTrees: localTrees.length,
+          myTrees: localTrees.length,
+          approvedTrees: 0,
+          pendingTrees: 0,
+          rejectedTrees: 0,
+          localTrees: pendingLocalTrees.length,
+          floraCount: 0,
+          faunaCount: 0,
+          floraApproved: 0,
+          faunaApproved: 0,
+          floraPending: 0,
+          faunaPending: 0,
+        });
         return;
       }
       
-      console.log('📊 [HomeScreen] Estadísticas obtenidas:', stats);
+      console.log('📊 [HomeScreen] Estadísticas del servidor:', stats);
       
-      // Usar las estadísticas calculadas por AuthContext
+      // Combinar estadísticas del servidor con locales
       const newStats = {
-        totalTrees: stats.total_trees,
-        myTrees: stats.total_trees,
-        approvedTrees: stats.approved_trees,
-        pendingTrees: stats.pending_trees,
-        rejectedTrees: stats.rejected_trees,
-        localTrees: stats.local_trees || 0,
+        totalTrees: stats.total_trees || 0,
+        myTrees: stats.total_trees || 0,
+        approvedTrees: stats.approved_trees || 0,
+        pendingTrees: stats.pending_trees || 0,
+        rejectedTrees: stats.rejected_trees || 0,
+        localTrees: pendingLocalTrees.length, // Usar conteo actualizado
         // Estadísticas por tipo
         floraCount: stats.flora_count || 0,
         faunaCount: stats.fauna_count || 0,
@@ -107,7 +148,7 @@ const HomeScreen = ({ navigation }) => {
         faunaPending: stats.fauna_pending || 0,
       };
 
-      console.log('📈 [HomeScreen] Estadísticas aplicadas:', newStats);
+      console.log('📈 [HomeScreen] Estadísticas finales:', newStats);
       setTreeStats(newStats);
     } catch (error) {
       console.error('❌ Error loading tree stats:', error);
@@ -116,8 +157,17 @@ const HomeScreen = ({ navigation }) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadTreeStats();
-    setRefreshing(false);
+    try {
+      console.log('🔄 [HomeScreen] Refresh manual - ejecutando auto-sync...');
+      // Ejecutar auto-sync para detectar cambios del servidor
+      await hybridTreeService.autoSync();
+      // Recargar estadísticas
+      await loadTreeStats();
+    } catch (error) {
+      console.error('❌ [HomeScreen] Error en refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleManualSync = async () => {
@@ -125,12 +175,40 @@ const HomeScreen = ({ navigation }) => {
     
     setSyncing(true);
     try {
-      const success = await forceSyncTrees();
-      if (success) {
+      console.log('🔄 [HomeScreen] Iniciando sincronización manual...');
+      
+      // Limpiar datos locales primero
+      console.log('🧹 [HomeScreen] Limpiando datos locales...');
+      const cleanResult = await hybridTreeService.cleanLocalData();
+      console.log(`🧹 [HomeScreen] Limpieza: ${cleanResult.removed} elementos eliminados`);
+      
+      // Usar HybridTreeService para sincronizar
+      const result = await hybridTreeService.syncLocalToMySQL();
+      
+      console.log(`✅ [HomeScreen] Sincronización completada: ${result.synced} exitosos, ${result.errors} errores`);
+      
+      // Recargar estadísticas siempre
+      console.log('🔄 [HomeScreen] Recargando estadísticas...');
+      await loadTreeStats();
+      
+      // Esperar un poco y recargar de nuevo para asegurar actualización
+      setTimeout(async () => {
+        console.log('🔄 [HomeScreen] Segunda recarga de estadísticas...');
         await loadTreeStats();
+      }, 1000);
+      
+      if (result.synced > 0) {
+        // Mostrar mensaje de éxito
+        alert(`¡Sincronización exitosa! ${result.synced} árboles sincronizados.`);
+      } else if (result.total === 0) {
+        alert('No hay árboles pendientes de sincronizar.');
+      } else {
+        alert(`Sincronización completada con ${result.errors} errores.`);
       }
+      
     } catch (error) {
-      console.error('Error in manual sync:', error);
+      console.error('❌ [HomeScreen] Error in manual sync:', error);
+      alert(`Error en sincronización: ${error.message}`);
     } finally {
       setSyncing(false);
     }

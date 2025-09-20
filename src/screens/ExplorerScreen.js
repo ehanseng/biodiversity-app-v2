@@ -309,17 +309,14 @@ ${tree.description || ''}`,
           <View style={styles.treeImageContainer}>
             <Image
               source={{ 
-                uri: tree.image_url || (tree.type === 'fauna' 
-                  ? 'https://picsum.photos/120/120?random=' + tree.id + '&blur=1'
-                  : 'https://picsum.photos/120/120?random=' + tree.id)
+                uri: tree.image_url && !tree.image_url.startsWith('blob:') 
+                  ? tree.image_url 
+                  : 'https://picsum.photos/300/200?random=default' 
               }}
               style={styles.treeImage}
               resizeMode="cover"
-              onError={(error) => {
-                console.log('❌ [ExplorerScreen] Error cargando imagen para', tree.common_name, ':', error.nativeEvent.error);
-              }}
-              onLoad={() => {
-                console.log('✅ [ExplorerScreen] Imagen cargada exitosamente para', tree.common_name);
+              onError={() => {
+                console.log('📷 [ExplorerScreen] Imagen no disponible para:', tree.common_name);
               }}
             />
             {/* Icono indicador de tipo */}
