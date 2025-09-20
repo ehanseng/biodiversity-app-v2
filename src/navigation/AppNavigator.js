@@ -25,6 +25,7 @@ import AdminScreen from '../screens/AdminScreen';
 import AddTreeScreen from '../screens/AddTreeScreen';
 import AddAnimalScreen from '../screens/AddAnimalScreen';
 import ScientistApprovalScreen from '../screens/ScientistApprovalScreen';
+import MySQLTestScreen from '../screens/MySQLTestScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -84,6 +85,7 @@ const MainStack = () => (
     <Stack.Screen name="AddTree" component={AddTreeScreen} />
     <Stack.Screen name="AddAnimal" component={AddAnimalScreen} />
     <Stack.Screen name="ScientistApproval" component={ScientistApprovalScreen} />
+    <Stack.Screen name="MySQLTest" component={MySQLTestScreen} />
   </Stack.Navigator>
 );
 

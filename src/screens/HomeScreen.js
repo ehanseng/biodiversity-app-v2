@@ -294,6 +294,15 @@ const HomeScreen = ({ navigation }) => {
               </>
             )}
           </View>
+          
+          {/* Sección de Prueba MySQL */}
+          <TouchableOpacity 
+            style={[styles.statCard, { borderLeftColor: '#17a2b8', backgroundColor: '#e3f2fd' }]}
+            onPress={() => navigation.navigate('MySQLTest')}
+          >
+            <Text style={styles.statNumber}>🗄️</Text>
+            <Text style={styles.statLabel}>Probar MySQL</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Botón especial para científicos y admins */}
