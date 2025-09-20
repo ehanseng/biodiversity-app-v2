@@ -14,6 +14,8 @@ import { useAuth } from '../contexts/NewAuthContext';
 import hybridTreeService from '../services/HybridTreeService';
 import TreeStorageService from '../services/TreeStorageService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
+import SimpleTreeStorage from '../services/SimpleTreeStorage';
+import mySQLService from '../services/MySQLService';
 
 const HomeScreen = ({ navigation }) => {
   const { user, profile, syncStats, forceSyncTrees, refreshProfile, getStats } = useAuth();
@@ -36,14 +38,10 @@ const HomeScreen = ({ navigation }) => {
     // Ejecutar sincronización automática al cargar
     const initializeApp = async () => {
       try {
-        // 1. Sincronización automática (limpia y marca como sincronizados)
-        const autoSyncResult = await hybridTreeService.autoSync();
-        console.log('🔄 [HomeScreen] Auto-sync resultado:', autoSyncResult);
-        
-        // 2. Cargar estadísticas actualizadas
+        // 1. Cargar estadísticas actualizadas
         await loadTreeStats();
         
-        // 3. Refrescar perfil
+        // 2. Refrescar perfil
         await refreshProfile();
         
       } catch (error) {
@@ -92,66 +90,38 @@ const HomeScreen = ({ navigation }) => {
 
   const loadTreeStats = async () => {
     try {
-      console.log('📊 [HomeScreen] Cargando estadísticas usando HybridTreeService...');
+      console.log('📊 [HomeScreen] Cargando estadísticas de la comunidad...');
       
-      // Obtener árboles locales pendientes de sincronizar
-      const localTrees = await TreeStorageService.getLocalTrees();
+      // Obtener árboles locales pendientes del usuario
+      const localTrees = SimpleTreeStorage.getLocalTrees();
       const pendingLocalTrees = localTrees.filter(tree => 
-        !tree.mysql_id && // No tiene ID de MySQL
-        (tree.syncStatus !== 'synced') && // No está marcado como sincronizado
-        tree.common_name && // Tiene nombre
-        tree.latitude && tree.longitude && // Tiene coordenadas
-        !isNaN(parseFloat(tree.latitude)) && !isNaN(parseFloat(tree.longitude)) // Coordenadas válidas
+        !tree.mysql_id && (tree.syncStatus !== 'synced') && tree.common_name
       );
       
-      console.log(`📊 [HomeScreen] Árboles locales pendientes: ${pendingLocalTrees.length}`);
-      
-      // Usar las estadísticas del AuthContext para el resto
-      const stats = await getStats();
-      
-      if (!stats) {
-        console.log('❌ [HomeScreen] No se pudieron obtener estadísticas del servidor');
-        // Solo mostrar estadísticas locales
-        setTreeStats({
-          totalTrees: localTrees.length,
-          myTrees: localTrees.length,
-          approvedTrees: 0,
-          pendingTrees: 0,
-          rejectedTrees: 0,
-          localTrees: pendingLocalTrees.length,
-          floraCount: 0,
-          faunaCount: 0,
-          floraApproved: 0,
-          faunaApproved: 0,
-          floraPending: 0,
-          faunaPending: 0,
-        });
-        return;
+      // Obtener estadísticas del servidor MySQL
+      let communityStats = { flora: 0, fauna: 0, total: 0 };
+      try {
+        const serverTrees = await mySQLService.getAllRecords();
+        console.log('🌐 [HomeScreen] Registros de la comunidad:', serverTrees.length);
+        
+        // Solo contar registros aprobados de la comunidad
+        const approvedTrees = serverTrees.filter(tree => tree.status === 'approved');
+        
+        communityStats = {
+          flora: approvedTrees.filter(tree => tree.type === 'flora' || !tree.type).length,
+          fauna: approvedTrees.filter(tree => tree.type === 'fauna').length,
+          total: approvedTrees.length,
+          pending: pendingLocalTrees.length // Árboles pendientes del usuario
+        };
+        
+        console.log('🌳 [HomeScreen] Estadísticas de la comunidad:', communityStats);
+      } catch (error) {
+        console.warn('⚠️ [HomeScreen] Error obteniendo datos de la comunidad:', error.message);
       }
-      
-      console.log('📊 [HomeScreen] Estadísticas del servidor:', stats);
-      
-      // Combinar estadísticas del servidor con locales
-      const newStats = {
-        totalTrees: stats.total_trees || 0,
-        myTrees: stats.total_trees || 0,
-        approvedTrees: stats.approved_trees || 0,
-        pendingTrees: stats.pending_trees || 0,
-        rejectedTrees: stats.rejected_trees || 0,
-        localTrees: pendingLocalTrees.length, // Usar conteo actualizado
-        // Estadísticas por tipo
-        floraCount: stats.flora_count || 0,
-        faunaCount: stats.fauna_count || 0,
-        floraApproved: stats.flora_approved || 0,
-        faunaApproved: stats.fauna_approved || 0,
-        floraPending: stats.flora_pending || 0,
-        faunaPending: stats.fauna_pending || 0,
-      };
 
-      console.log('📈 [HomeScreen] Estadísticas finales:', newStats);
-      setTreeStats(newStats);
+      setTreeStats(communityStats);
     } catch (error) {
-      console.error('❌ Error loading tree stats:', error);
+      console.error('❌ Error loading community stats:', error);
     }
   };
 
@@ -295,91 +265,42 @@ const HomeScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* Estadísticas */}
+        {/* Estadísticas de la Comunidad */}
         <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>📊 Estadísticas</Text>
+          <Text style={styles.sectionTitle}>🌍 Registros de la Comunidad</Text>
           
-          <View style={styles.statsGrid}>
+          <View style={styles.communityStatsGrid}>
+            {/* Flora */}
             <TouchableOpacity 
-              style={[styles.statCard, { borderLeftColor: '#28a745' }]}
-              onPress={() => navigation.navigate('Explorer', { initialFilter: 'all' })}
+              style={styles.communityStatCard}
+              onPress={() => navigation.navigate('Explorer', { initialFilter: 'approved' })}
             >
-              <Text style={styles.statNumber}>{treeStats.totalTrees}</Text>
-              <Text style={styles.statLabel}>Aprobados (Todos)</Text>
+              <View style={styles.communityStatIcon}>
+                <Text style={styles.communityStatEmoji}>🌳</Text>
+              </View>
+              <Text style={styles.communityStatNumber}>{treeStats.flora || 0}</Text>
+              <Text style={styles.communityStatLabel}>Flora Aprobada</Text>
             </TouchableOpacity>
             
-            {/* Mostrar estadísticas de "mis árboles" para exploradores, científicos y admins */}
-            {(profile?.role === 'explorer' || profile?.role === 'scientist' || profile?.role === 'admin') && (
-              <>
-                <TouchableOpacity 
-                  style={[styles.statCard, { borderLeftColor: '#007bff' }]}
-                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'mine' })}
-                >
-                  <Text style={styles.statNumber}>{treeStats.myTrees}</Text>
-                  <Text style={styles.statLabel}>Mis Árboles</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.statCard, { borderLeftColor: '#28a745' }]}
-                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'approved' })}
-                >
-                  <Text style={styles.statNumber}>{treeStats.approvedTrees}</Text>
-                  <Text style={styles.statLabel}>Mis Aprobados</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.statCard, { borderLeftColor: '#ffc107' }]}
-                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'pending' })}
-                >
-                  <Text style={styles.statNumber}>{treeStats.pendingTrees}</Text>
-                  <Text style={styles.statLabel}>Mis Pendientes</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.statCard, { borderLeftColor: '#dc3545' }]}
-                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'rejected' })}
-                >
-                  <Text style={styles.statNumber}>{treeStats.rejectedTrees}</Text>
-                  <Text style={styles.statLabel}>Mis Rechazados</Text>
-                </TouchableOpacity>
-                
-                {/* Separación por Flora y Fauna */}
-                <TouchableOpacity 
-                  style={[styles.statCard, { borderLeftColor: '#228B22' }]}
-                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'mine' })}
-                >
-                  <Text style={styles.statNumber}>{treeStats.floraCount}</Text>
-                  <Text style={styles.statLabel}>🌳 Mi Flora</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.statCard, { borderLeftColor: '#FF6B6B' }]}
-                  onPress={() => navigation.navigate('Explorer', { initialFilter: 'mine' })}
-                >
-                  <Text style={styles.statNumber}>{treeStats.faunaCount}</Text>
-                  <Text style={styles.statLabel}>🦋 Mi Fauna</Text>
-                </TouchableOpacity>
-                
-                {treeStats.localTrees > 0 && (
-                  <TouchableOpacity 
-                    style={[styles.statCard, { borderLeftColor: '#6f42c1' }]}
-                    onPress={() => navigation.navigate('Explorer', { initialFilter: 'local' })}
-                  >
-                    <Text style={styles.statNumber}>{treeStats.localTrees}</Text>
-                    <Text style={styles.statLabel}>Locales</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
+            {/* Fauna */}
+            <TouchableOpacity 
+              style={styles.communityStatCard}
+              onPress={() => navigation.navigate('Explorer', { initialFilter: 'approved' })}
+            >
+              <View style={styles.communityStatIcon}>
+                <Text style={styles.communityStatEmoji}>🐾</Text>
+              </View>
+              <Text style={styles.communityStatNumber}>{treeStats.fauna || 0}</Text>
+              <Text style={styles.communityStatLabel}>Fauna Aprobada</Text>
+            </TouchableOpacity>
           </View>
           
-          {/* Sección de Prueba MySQL */}
           <TouchableOpacity 
-            style={[styles.statCard, { borderLeftColor: '#17a2b8', backgroundColor: '#e3f2fd' }]}
-            onPress={() => navigation.navigate('MySQLTest')}
+            style={styles.exploreButton}
+            onPress={() => navigation.navigate('Explorer')}
           >
-            <Text style={styles.statNumber}>🗄️</Text>
-            <Text style={styles.statLabel}>Probar MySQL</Text>
+            <Ionicons name="search-outline" size={20} color="#ffffff" />
+            <Text style={styles.exploreButtonText}>Ver Todos los Registros</Text>
           </TouchableOpacity>
         </View>
 
@@ -543,6 +464,60 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6c757d',
     fontWeight: '600',
+  },
+  communityStatsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  communityStatCard: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    width: '45%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 8,
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)',
+  },
+  communityStatIcon: {
+    marginBottom: 10,
+  },
+  communityStatEmoji: {
+    fontSize: 40,
+  },
+  communityStatNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2d5016',
+    marginBottom: 5,
+  },
+  communityStatLabel: {
+    fontSize: 14,
+    color: '#6c757d',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  exploreButton: {
+    backgroundColor: '#2d5016',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  exploreButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   actionsContainer: {
     padding: 15,

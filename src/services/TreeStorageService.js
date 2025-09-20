@@ -5,8 +5,41 @@ const TREES_STORAGE_KEY = '@biodiversity_trees';
 const SYNC_STATUS_KEY = '@biodiversity_sync_status';
 
 class TreeStorageService {
+  static STORAGE_KEY = '@biodiversity_trees';
+  
+  // Obtener clave de storage específica por usuario
+  static getUserStorageKey(userId = null) {
+    // Si no hay userId, usar el usuario actual del contexto
+    if (!userId) {
+      // Intentar obtener del localStorage del auth
+      const authData = localStorage.getItem('@biodiversity_auth');
+      if (authData) {
+        try {
+          const auth = JSON.parse(authData);
+          userId = auth.user?.id || auth.user?.email || 'default';
+        } catch (error) {
+          userId = 'default';
+        }
+      } else {
+        userId = 'default';
+      }
+    }
+    return `${this.STORAGE_KEY}_${userId}`;
+  }
+
+  // Limpiar datos de localStorage al cambiar de usuario
+  static clearUserData(userId = null) {
+    try {
+      const storageKey = this.getUserStorageKey(userId);
+      localStorage.removeItem(storageKey);
+      console.log(`🧹 [TreeStorageService] Datos limpiados para usuario: ${userId || 'actual'}`);
+    } catch (error) {
+      console.error('❌ Error limpiando datos de usuario:', error);
+    }
+  }
+
   // Inicializar datos de prueba si no existen
-  async initializeSampleData() {
+  static async initializeSampleData() {
     try {
       const existingTrees = await this.getLocalTrees();
       
@@ -64,25 +97,25 @@ class TreeStorageService {
     }
   }
 
-  // Guardar árbol localmente
-  async saveTreeLocally(treeData) {
+  // Guardar árbol localmente específico del usuario
+  static async saveTreeLocally(treeData, userId = null) {
     try {
-      const existingTrees = await this.getLocalTrees();
+      const storageKey = this.getUserStorageKey(userId);
+      const existingTrees = await this.getLocalTrees(userId);
       const newTree = {
         ...treeData,
-        id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: treeData.id || `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         isLocal: true,
-        syncStatus: 'pending', // pending, error
-        createdAt: new Date().toISOString(),
+        syncStatus: treeData.syncStatus || 'pending',
+        createdAt: treeData.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       
       const updatedTrees = [...existingTrees, newTree];
-      await AsyncStorage.setItem(TREES_STORAGE_KEY, JSON.stringify(updatedTrees));
+      localStorage.setItem(storageKey, JSON.stringify(updatedTrees));
       
-      console.log('✅ [TreeStorageService] Árbol guardado localmente:', newTree.id);
+      console.log(`✅ [TreeStorageService] Árbol guardado localmente para usuario ${userId || 'actual'}:`, newTree.id);
       console.log('📊 [TreeStorageService] Total árboles en storage:', updatedTrees.length);
-      console.log('🔍 [TreeStorageService] Árbol guardado completo:', newTree);
       return newTree;
     } catch (error) {
       console.error('❌ Error guardando árbol localmente:', error);
@@ -90,12 +123,13 @@ class TreeStorageService {
     }
   }
 
-  // Obtener árboles locales
-  async getLocalTrees() {
+  // Obtener árboles locales específicos del usuario
+  static async getLocalTrees(userId = null) {
     try {
-      const treesJson = await AsyncStorage.getItem(TREES_STORAGE_KEY);
+      const storageKey = this.getUserStorageKey(userId);
+      const treesJson = localStorage.getItem(storageKey);
       const trees = treesJson ? JSON.parse(treesJson) : [];
-      console.log('📋 [TreeStorageService] Árboles locales recuperados:', trees.length);
+      console.log(`📋 [TreeStorageService] Árboles locales recuperados para usuario ${userId || 'actual'}:`, trees.length);
       if (trees.length > 0) {
         console.log('🔍 [TreeStorageService] Primer árbol local:', trees[0]);
       }

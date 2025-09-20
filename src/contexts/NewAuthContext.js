@@ -1,6 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import TreeStorageService from '../services/TreeStorageService';
-import hybridTreeService from '../services/HybridTreeService';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import SimpleTreeStorage from '../services/SimpleTreeStorage';
+import mySQLService from '../services/MySQLService';
 
 const AuthContext = createContext({});
 
@@ -62,9 +62,7 @@ export const AuthProvider = ({ children }) => {
         const userData = JSON.parse(savedUser);
         console.log('✅ [AuthContext] Usuario encontrado en localStorage');
         setUser(userData);
-        
-        // Inicializar datos de prueba si es necesario
-        await TreeStorageService.initializeSampleData();
+        console.log('✅ [AuthContext] Usuario autenticado correctamente');
       } else {
         console.log('❌ [AuthContext] No hay sesión activa');
       }
@@ -80,35 +78,46 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 [AuthContext] Iniciando login...');
       setError(null);
       
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Buscar usuario en datos mock
-      const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
-      
-      if (!foundUser) {
-        throw new Error('Credenciales inválidas');
-      }
-      
-      // Crear usuario sin password para guardar
-      const userToSave = {
-        id: foundUser.id,
-        email: foundUser.email,
-        full_name: foundUser.full_name,
-        role: foundUser.role,
-        created_at: foundUser.created_at
+      const login = async (email, password) => {
+        try {
+          console.log('🔐 [AuthContext] Intentando login con:', email);
+          
+          // Buscar usuario en la lista de usuarios mock
+          const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
+          
+          if (!foundUser) {
+            throw new Error('Credenciales inválidas');
+          }
+
+          // Simular delay de autenticación
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          const userData = {
+            id: foundUser.id,
+            email: foundUser.email,
+            role: foundUser.role
+          };
+
+          setUser(userData);
+          //setProfile(foundUser);
+          
+          // Guardar en localStorage
+          localStorage.setItem('biodiversity_user', JSON.stringify(userData));
+
+          console.log('✅ [AuthContext] Login exitoso:', userData);
+          console.log('🔄 [AuthContext] Datos locales ahora son específicos del usuario:', userData.email);
+          
+          return { user: userData, profile: foundUser };
+        } catch (error) {
+          console.error('❌ [AuthContext] Error en login:', error);
+          throw error;
+        }
       };
       
-      // Guardar en localStorage
-      localStorage.setItem('biodiversity_user', JSON.stringify(userToSave));
-      
-      console.log('✅ [AuthContext] Login exitoso');
-      setUser(userToSave);
-      return { success: true, user: userToSave };
-      
+      const result = await login(email, password);
+      return { success: true, ...result };
     } catch (error) {
-      console.error('❌ [AuthContext] Error en login:', error);
-      setError(error.message);
+      console.error('❌ [AuthContext] Error en signIn:', error);
       return { success: false, error: error.message };
     }
   };
@@ -198,16 +207,10 @@ export const AuthProvider = ({ children }) => {
       
       console.log('📊 [AuthContext] Calculando estadísticas reales...');
       
-      // Obtener todos los árboles (igual que getAllTrees)
-      const localTrees = await TreeStorageService.getLocalTrees();
-      const dbTrees = await TreeStorageService.getTreesFromDatabase();
-      const allTrees = [...localTrees, ...dbTrees];
+      // Obtener árboles locales del usuario actual (ya filtrados por usuario)
+      const userTrees = SimpleTreeStorage.getLocalTrees();
       
-      console.log('📋 [AuthContext] Árboles para estadísticas:', allTrees.length);
-      
-      // Filtrar árboles del usuario actual
-      const userTrees = allTrees.filter(tree => tree.user_id === user.id);
-      console.log('👤 [AuthContext] Árboles del usuario:', userTrees.length);
+      console.log('📋 [AuthContext] Árboles del usuario para estadísticas:', userTrees.length);
       
       // Separar por tipo
       const userFlora = userTrees.filter(tree => tree.type === 'flora' || !tree.type); // Sin tipo = flora por defecto
@@ -229,8 +232,8 @@ export const AuthProvider = ({ children }) => {
           (tree.status === 'rejected') || 
           (tree.syncStatus === 'rejected')
         ).length,
-        local_trees: localTrees.filter(tree => tree.user_id === user.id).length,
-        synced_trees: dbTrees.filter(tree => tree.user_id === user.id).length,
+        local_trees: userTrees.filter(tree => !tree.mysql_id || tree.syncStatus !== 'synced').length,
+        synced_trees: userTrees.filter(tree => tree.mysql_id && tree.syncStatus === 'synced').length,
         // Estadísticas por tipo
         flora_count: userFlora.length,
         fauna_count: userFauna.length,
@@ -261,10 +264,22 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🌳 [AuthContext] Obteniendo árboles híbridos (localStorage + MySQL)...');
       
-      // Usar el servicio híbrido que maneja localStorage Y MySQL
-      const allTrees = await hybridTreeService.getAllTrees();
+      // Obtener árboles locales del usuario
+      const localTrees = SimpleTreeStorage.getLocalTrees();
+      
+      // Obtener árboles del servidor MySQL
+      let serverTrees = [];
+      try {
+        serverTrees = await mySQLService.getAllRecords();
+      } catch (error) {
+        console.warn('⚠️ [AuthContext] No se pudieron obtener árboles del servidor:', error.message);
+      }
+      
+      // Combinar árboles locales y del servidor
+      const allTrees = [...localTrees, ...serverTrees];
       console.log('📊 [AuthContext] Total árboles híbridos encontrados:', allTrees.length);
-      console.log('✅ [AuthContext] Total de árboles:', allTrees.length);
+      console.log('   📱 Locales:', localTrees.length);
+      console.log('   🌐 Servidor:', serverTrees.length);
       
       return allTrees;
     } catch (error) {

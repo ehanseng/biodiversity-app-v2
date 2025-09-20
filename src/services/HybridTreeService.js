@@ -1,7 +1,8 @@
 // Servicio híbrido que maneja localStorage Y MySQL
 import TreeStorageService from './TreeStorageService';
 import mySQLService from './MySQLService';
-import { useAuth } from '../contexts/NewAuthContext';
+import UserDataManager from '../utils/UserDataManager';
+import SimpleTreeStorage from './SimpleTreeStorage';
 
 class HybridTreeService {
   constructor() {
@@ -322,7 +323,7 @@ class HybridTreeService {
     try {
       console.log('🧹 [HybridTreeService] Limpiando datos locales...');
       
-      const localTrees = await TreeStorageService.getLocalTrees();
+      const localTrees = SimpleTreeStorage.getLocalTrees();
       console.log(`📊 [HybridTreeService] Árboles locales antes de limpiar: ${localTrees.length}`);
       
       // Obtener registros existentes en MySQL
@@ -392,7 +393,7 @@ class HybridTreeService {
       console.log(`   🔄 Marcados como sincronizados: ${marked_synced}`);
       
       // Guardar datos limpios
-      localStorage.setItem('@biodiversity_trees', JSON.stringify(cleanedTrees));
+      SimpleTreeStorage.saveLocalTrees(cleanedTrees);
       
       return {
         original: localTrees.length,
@@ -425,8 +426,10 @@ class HybridTreeService {
         return { cleaned: cleanResult, server_records: 0, local_pending: 0 };
       }
       
-      // 3. Contar registros locales pendientes después de la limpieza
-      const localTrees = await TreeStorageService.getLocalTrees();
+      // Obtener árboles locales pendientes de sincronizar (específicos del usuario)
+      const userStorageKey = UserDataManager.getUserStorageKey();
+      const treesJson = localStorage.getItem(userStorageKey);
+      const localTrees = treesJson ? JSON.parse(treesJson) : [];
       const pendingTrees = localTrees.filter(tree => 
         !tree.mysql_id && 
         (tree.syncStatus !== 'synced') && 
