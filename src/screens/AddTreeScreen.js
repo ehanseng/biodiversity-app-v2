@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 // Supabase removido - usando sistema simple
 import { useAuth } from '../contexts/NewAuthContext';
 import newTreeService from '../services/NewTreeService';
+import hybridTreeService from '../services/HybridTreeService';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import Toast from '../components/Toast';
 import useToast from '../hooks/useToast';
@@ -280,6 +281,7 @@ const AddTreeScreen = ({ navigation }) => {
     try {
       // Preparar datos del árbol
       const treeData = {
+        user_id: user?.id || 1, // ID del usuario logueado
         common_name: formData.common_name.trim(),
         scientific_name: formData.scientific_name.trim() || null,
         description: formData.description.trim() || null,
@@ -293,8 +295,8 @@ const AddTreeScreen = ({ navigation }) => {
 
       console.log('🚀 [AddTreeScreen] TreeData preparado:', treeData);
       
-      // Usar el nuevo servicio que maneja imagen y datos juntos
-      const result = await newTreeService.createTree(treeData, image);
+      // Usar el servicio híbrido que maneja localStorage Y MySQL
+      const result = await hybridTreeService.createTree(treeData, image);
       
       if (result.success) {
         console.log('✅ [AddTreeScreen] Árbol creado exitosamente:', result);

@@ -71,16 +71,35 @@ const ExplorerScreen = ({ navigation, route }) => {
   const loadTrees = async () => {
     try {
       setLoading(true);
-      console.log(' [ExplorerScreen] Cargando árboles...');
-      console.log(' [ExplorerScreen] User ID:', user?.id);
+      console.log('🌳 [ExplorerScreen] Cargando árboles híbridos...');
+      console.log('👤 [ExplorerScreen] User ID:', user?.id);
       
       const allTrees = await getAllTrees();
-      console.log(' [ExplorerScreen] Árboles obtenidos:', allTrees.length);
-      console.log(' [ExplorerScreen] Primer árbol:', allTrees[0]);
+      console.log('📊 [ExplorerScreen] Árboles obtenidos:', allTrees.length);
+      
+      // Debug: mostrar estructura de los primeros árboles
+      if (allTrees.length > 0) {
+        console.log('🔍 [ExplorerScreen] Primer árbol:', allTrees[0]);
+        console.log('🔍 [ExplorerScreen] Campos disponibles:', Object.keys(allTrees[0]));
+        
+        // Mostrar algunos árboles para entender la estructura
+        allTrees.slice(0, 3).forEach((tree, index) => {
+          console.log(`🌳 [ExplorerScreen] Árbol ${index + 1}:`, {
+            id: tree.id,
+            common_name: tree.common_name,
+            user_id: tree.user_id,
+            status: tree.status,
+            approval_status: tree.approval_status,
+            syncStatus: tree.syncStatus,
+            source: tree.source,
+            type: tree.type
+          });
+        });
+      }
       
       setTrees(allTrees);
     } catch (error) {
-      console.error(' [ExplorerScreen] Error loading trees:', error);
+      console.error('❌ [ExplorerScreen] Error loading trees:', error);
       Alert.alert('Error', 'No se pudieron cargar los árboles');
     } finally {
       setLoading(false);
@@ -94,58 +113,102 @@ const ExplorerScreen = ({ navigation, route }) => {
   };
 
   const getFilteredTrees = () => {
+    console.log(`🔍 [ExplorerScreen] Filtrando por: ${filter}`);
+    console.log(`📊 [ExplorerScreen] Total árboles antes de filtrar: ${trees.length}`);
+    
+    // Función helper para determinar el estado de un árbol
+    const getTreeStatus = (tree) => {
+      // Para árboles de MySQL
+      if (tree.source === 'mysql') {
+        return tree.status || 'pending';
+      }
+      // Para árboles locales
+      if (tree.source === 'local') {
+        return tree.syncStatus || 'pending';
+      }
+      // Fallback para otros casos
+      return tree.status || tree.approval_status || tree.syncStatus || 'pending';
+    };
+
+    // Función helper para determinar si un árbol es mío
+    const isMyTree = (tree) => {
+      const userId = parseInt(user?.id) || 1;
+      const treeUserId = parseInt(tree.user_id);
+      
+      return treeUserId === userId || 
+             (tree.source === 'local' && tree.canEdit) ||
+             tree.canEdit === true;
+    };
+
+    let filtered = [];
+    
     switch (filter) {
       case 'mine':
         // TODOS mis árboles (míos y locales), sin importar el estado
-        return trees.filter(tree => 
-          tree.user_id === user.id || 
-          (tree.source === 'local' && tree.canEdit)
-        );
+        filtered = trees.filter(tree => isMyTree(tree));
+        break;
+        
       case 'approved':
         // SOLO MIS árboles aprobados
-        return trees.filter(tree => {
-          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-          return isMine && (
-            (tree.status === 'approved') || 
-            (tree.approval_status === 'approved') ||
-            (tree.syncStatus === 'approved')
-          );
+        filtered = trees.filter(tree => {
+          const isMine = isMyTree(tree);
+          const status = getTreeStatus(tree);
+          return isMine && status === 'approved';
         });
+        break;
+        
       case 'pending':
-        // SOLO MIS árboles pendientes de aprobación (ya están en el servidor)
-        return trees.filter(tree => {
-          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-          return isMine && (
-            (tree.status === 'pending') || 
-            (tree.approval_status === 'pending')
-          ) && tree.source !== 'local'; // Excluir árboles locales
+        // SOLO MIS árboles pendientes
+        filtered = trees.filter(tree => {
+          const isMine = isMyTree(tree);
+          const status = getTreeStatus(tree);
+          return isMine && status === 'pending';
         });
+        break;
+        
       case 'rejected':
-        // SOLO MIS árboles rechazados (ya están en el servidor)
-        return trees.filter(tree => {
-          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-          return isMine && (
-            (tree.status === 'rejected') || 
-            (tree.approval_status === 'rejected')
-          ) && tree.source !== 'local'; // Excluir árboles locales
+        // SOLO MIS árboles rechazados
+        filtered = trees.filter(tree => {
+          const isMine = isMyTree(tree);
+          const status = getTreeStatus(tree);
+          return isMine && status === 'rejected';
         });
+        break;
+        
       case 'local':
-        // SOLO MIS árboles que NO se han podido subir (falta de internet)
-        return trees.filter(tree => {
-          const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-          return isMine && (
-            tree.source === 'local' || 
-            tree.syncStatus === 'error' // Solo errores de sincronización, no pendientes
-          );
+        // SOLO MIS árboles locales (no sincronizados)
+        filtered = trees.filter(tree => {
+          const isMine = isMyTree(tree);
+          return isMine && (tree.source === 'local' || tree.syncStatus === 'error');
         });
+        break;
+        
       default: // 'all'
-        // SOLO árboles aprobados de TODOS los usuarios (míos y de otros)
-        return trees.filter(tree => 
-          (tree.status === 'approved') || 
-          (tree.approval_status === 'approved') ||
-          (tree.syncStatus === 'approved')
-        );
+        // TODOS los árboles aprobados (míos y de otros usuarios)
+        filtered = trees.filter(tree => {
+          const status = getTreeStatus(tree);
+          return status === 'approved';
+        });
+        break;
     }
+    
+    console.log(`✅ [ExplorerScreen] Árboles filtrados (${filter}): ${filtered.length}`);
+    
+    // Debug: mostrar algunos árboles filtrados
+    if (filtered.length > 0) {
+      filtered.slice(0, 2).forEach((tree, index) => {
+        console.log(`🌳 [ExplorerScreen] Filtrado ${index + 1}:`, {
+          id: tree.id,
+          name: tree.common_name,
+          user_id: tree.user_id,
+          status: getTreeStatus(tree),
+          source: tree.source,
+          isMine: isMyTree(tree)
+        });
+      });
+    }
+    
+    return filtered;
   };
 
   const getStatusColor = (tree) => {
@@ -355,49 +418,26 @@ ${tree.description || ''}`,
 
   const filteredTrees = getFilteredTrees();
   
-  // Contadores para cada filtro
-  const allCount = trees.filter(tree => 
-    (tree.status === 'approved') || 
-    (tree.approval_status === 'approved') ||
-    (tree.syncStatus === 'approved')
-  ).length; // SOLO árboles aprobados de TODOS los usuarios
+  // Funciones helper reutilizables para contadores
+  const getTreeStatus = (tree) => {
+    if (tree.source === 'mysql') return tree.status || 'pending';
+    if (tree.source === 'local') return tree.syncStatus || 'pending';
+    return tree.status || tree.approval_status || tree.syncStatus || 'pending';
+  };
+
+  const isMyTree = (tree) => {
+    const userId = parseInt(user?.id) || 1;
+    const treeUserId = parseInt(tree.user_id);
+    return treeUserId === userId || (tree.source === 'local' && tree.canEdit) || tree.canEdit === true;
+  };
   
-  const myTreesCount = trees.filter(tree => 
-    tree.user_id === user.id || (tree.source === 'local' && tree.canEdit)
-  ).length; // TODOS mis árboles
-  
-  const approvedCount = trees.filter(tree => {
-    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-    return isMine && (
-      (tree.status === 'approved') || 
-      (tree.approval_status === 'approved') ||
-      (tree.syncStatus === 'approved')
-    );
-  }).length; // SOLO MIS árboles aprobados
-  
-  const pendingCount = trees.filter(tree => {
-    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-    return isMine && (
-      (tree.status === 'pending') || 
-      (tree.approval_status === 'pending')
-    ) && tree.source !== 'local'; // Solo árboles en servidor esperando aprobación
-  }).length; // SOLO MIS árboles pendientes de aprobación
-  
-  const rejectedCount = trees.filter(tree => {
-    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-    return isMine && (
-      (tree.status === 'rejected') || 
-      (tree.approval_status === 'rejected')
-    ) && tree.source !== 'local'; // Solo árboles en servidor rechazados
-  }).length; // SOLO MIS árboles rechazados
-  
-  const localCount = trees.filter(tree => {
-    const isMine = tree.user_id === user.id || (tree.source === 'local' && tree.canEdit);
-    return isMine && (
-      tree.source === 'local' || 
-      tree.syncStatus === 'error' // Solo errores de subida, no pendientes
-    );
-  }).length; // SOLO MIS árboles que no se han podido subir
+  // Contadores actualizados con la nueva lógica
+  const allCount = trees.filter(tree => getTreeStatus(tree) === 'approved').length;
+  const myTreesCount = trees.filter(tree => isMyTree(tree)).length;
+  const approvedCount = trees.filter(tree => isMyTree(tree) && getTreeStatus(tree) === 'approved').length;
+  const pendingCount = trees.filter(tree => isMyTree(tree) && getTreeStatus(tree) === 'pending').length;
+  const rejectedCount = trees.filter(tree => isMyTree(tree) && getTreeStatus(tree) === 'rejected').length;
+  const localCount = trees.filter(tree => isMyTree(tree) && (tree.source === 'local' || tree.syncStatus === 'error')).length;
 
   const toggleFabMenu = () => {
     const toValue = fabOpen ? 0 : 1;

@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import TreeStorageService from '../services/TreeStorageService';
+import hybridTreeService from '../services/HybridTreeService';
 
 const AuthContext = createContext({});
 
@@ -258,18 +259,11 @@ export const AuthProvider = ({ children }) => {
   const getAllTrees = async () => {
     if (!user) return [];
     try {
-      console.log('🌳 [AuthContext] Obteniendo árboles del usuario...');
+      console.log('🌳 [AuthContext] Obteniendo árboles híbridos (localStorage + MySQL)...');
       
-      // Obtener árboles locales del TreeStorageService
-      const localTrees = await TreeStorageService.getLocalTrees();
-      console.log('📋 [AuthContext] Árboles locales encontrados:', localTrees.length);
-      
-      // También obtener árboles de la "base de datos" (mock)
-      const dbTrees = await TreeStorageService.getTreesFromDatabase();
-      console.log('🗄️ [AuthContext] Árboles de BD encontrados:', dbTrees.length);
-      
-      // Combinar ambos
-      const allTrees = [...localTrees, ...dbTrees];
+      // Usar el servicio híbrido que maneja localStorage Y MySQL
+      const allTrees = await hybridTreeService.getAllTrees();
+      console.log('📊 [AuthContext] Total árboles híbridos encontrados:', allTrees.length);
       console.log('✅ [AuthContext] Total de árboles:', allTrees.length);
       
       return allTrees;
