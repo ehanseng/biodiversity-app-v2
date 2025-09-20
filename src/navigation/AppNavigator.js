@@ -80,6 +80,16 @@ const MainTabs = () => {
         },
         tabBarActiveTintColor: '#2d5016',
         tabBarInactiveTintColor: 'gray',
+        tabBarStyle: {
+          height: 70,
+          paddingBottom: 0,
+        },
+        tabBarItemStyle: {
+          paddingVertical: 5,
+        },
+        tabBarLabelStyle: {
+          marginBottom: 2,
+        },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
@@ -97,7 +107,11 @@ const MainTabs = () => {
       {profile?.role === 'scientist' && <Tab.Screen name="Scientist" component={ScientistScreen} />}
       {profile?.role === 'admin' && <Tab.Screen name="Admin" component={AdminScreen} />}
 
-      <Tab.Screen name="Map" component={MapScreen} />
+      <Tab.Screen 
+        name="Map" 
+        component={MapScreen}
+        options={{ title: 'Mapa' }}
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

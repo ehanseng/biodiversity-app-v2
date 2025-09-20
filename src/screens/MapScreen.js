@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-// Supabase removido - usando datos mock
+import SimpleTreeService from '../services/SimpleTreeService';
+import SimpleAnimalService from '../services/SimpleAnimalService';
 
 const MapScreen = () => {
   const [trees, setTrees] = useState([]);
@@ -16,6 +17,18 @@ const MapScreen = () => {
     if (Platform.OS === 'web') {
       loadLeafletMap();
     }
+
+    // Cleanup function
+    return () => {
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        } catch (error) {
+          console.warn('🗺️ [MapScreen] Error limpiando mapa:', error.message);
+        }
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -26,43 +39,32 @@ const MapScreen = () => {
 
   const fetchData = async () => {
     try {
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('🗺️ [MapScreen] Cargando datos de biodiversidad...');
       
-      // Datos mock para árboles
-      const mockTrees = [
-        {
-          id: 1,
-          common_name: 'Ceiba',
-          scientific_name: 'Ceiba pentandra',
-          latitude: 4.6097,
-          longitude: -74.0817,
-          approval_status: 'approved'
-        },
-        {
-          id: 2,
-          common_name: 'Guayacán',
-          scientific_name: 'Tabebuia chrysantha',
-          latitude: 4.6100,
-          longitude: -74.0820,
-          approval_status: 'approved'
-        }
-      ];
+      // Cargar árboles desde SimpleTreeService
+      const treeService = new SimpleTreeService();
+      const allTrees = await treeService.getAllTrees();
+      
+      // Cargar animales desde SimpleAnimalService
+      const animalService = new SimpleAnimalService();
+      const allAnimals = await animalService.getAllAnimals();
+      
+      // Filtrar solo los aprobados para el mapa
+      const approvedTrees = allTrees.filter(tree => {
+        const status = tree.status || tree.approval_status;
+        return status === 'approved' && tree.latitude && tree.longitude;
+      });
+      
+      const approvedAnimals = allAnimals.filter(animal => {
+        const status = animal.status || animal.approval_status;
+        return status === 'approved' && animal.latitude && animal.longitude;
+      });
+      
+      console.log('🌳 [MapScreen] Árboles aprobados:', approvedTrees.length);
+      console.log('🐾 [MapScreen] Animales aprobados:', approvedAnimals.length);
 
-      // Datos mock para animales
-      const mockAnimals = [
-        {
-          id: 1,
-          common_name: 'Colibrí',
-          scientific_name: 'Trochilidae',
-          latitude: 4.6095,
-          longitude: -74.0815,
-          approval_status: 'approved'
-        }
-      ];
-
-      setTrees(mockTrees);
-      setAnimals(mockAnimals);
+      setTrees(approvedTrees);
+      setAnimals(approvedAnimals);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -85,18 +87,79 @@ const MapScreen = () => {
     }
   };
 
+  const createCustomIcon = (color, type) => {
+    if (typeof window !== 'undefined' && window.L) {
+      const iconHtml = type === 'tree' ? 
+        `<div style="
+          background-color: ${color};
+          width: 25px;
+          height: 25px;
+          border-radius: 50% 50% 50% 0;
+          border: 3px solid #ffffff;
+          transform: rotate(-45deg);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <span style="
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            transform: rotate(45deg);
+          ">🌳</span>
+        </div>` :
+        `<div style="
+          background-color: ${color};
+          width: 25px;
+          height: 25px;
+          border-radius: 50% 50% 50% 0;
+          border: 3px solid #ffffff;
+          transform: rotate(-45deg);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <span style="
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            transform: rotate(45deg);
+          ">🐾</span>
+        </div>`;
+
+      return window.L.divIcon({
+        html: iconHtml,
+        className: 'custom-marker',
+        iconSize: [25, 25],
+        iconAnchor: [12, 25],
+        popupAnchor: [0, -25]
+      });
+    }
+    return null;
+  };
+
   const initializeMap = () => {
-    if (typeof window !== 'undefined' && window.L && mapRef.current) {
-      // Initialize map centered on a default location
-      const map = window.L.map(mapRef.current).setView([19.4326, -99.1332], 10); // Mexico City default
+    if (typeof window !== 'undefined' && window.L && mapRef.current && !mapInstanceRef.current) {
+      try {
+        // Initialize map centered on a default location
+        const map = window.L.map(mapRef.current).setView([19.4326, -99.1332], 10); // Mexico City default
 
-      // Add tile layer
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: ' OpenStreetMap contributors'
-      }).addTo(map);
+        // Add tile layer
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: ' OpenStreetMap contributors'
+        }).addTo(map);
 
-      mapInstanceRef.current = map;
-      updateMapMarkers();
+        mapInstanceRef.current = map;
+        updateMapMarkers();
+      } catch (error) {
+        console.warn('🗺️ [MapScreen] Error inicializando mapa:', error.message);
+        // Si el mapa ya existe, solo actualizar marcadores
+        if (mapInstanceRef.current) {
+          updateMapMarkers();
+        }
+      }
     }
   };
 
@@ -117,16 +180,25 @@ const MapScreen = () => {
     if (selectedFilter === 'all' || selectedFilter === 'trees') {
       trees.forEach((tree) => {
         if (tree.latitude && tree.longitude) {
-          const marker = window.L.marker([tree.latitude, tree.longitude])
+          const treeIcon = createCustomIcon('#28a745', 'tree'); // Verde para árboles
+          const marker = window.L.marker([tree.latitude, tree.longitude], { icon: treeIcon })
             .addTo(map)
             .bindPopup(`
-              <div style="min-width: 200px;">
-                <h3 style="margin: 0 0 8px 0; color: #2d5016;"> ${tree.common_name}</h3>
+              <div style="min-width: 250px; max-width: 300px;">
+                ${tree.image_url ? `
+                  <div style="margin-bottom: 10px;">
+                    <img src="${tree.image_url}" 
+                         style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" 
+                         alt="${tree.common_name}"
+                         onerror="this.style.display='none';" />
+                  </div>
+                ` : ''}
+                <h3 style="margin: 0 0 8px 0; color: #2d5016;">🌳 ${tree.common_name}</h3>
                 ${tree.scientific_name ? `<p style="margin: 0 0 4px 0; font-style: italic; color: #666;">${tree.scientific_name}</p>` : ''}
                 ${tree.description ? `<p style="margin: 0 0 4px 0; color: #333;">${tree.description}</p>` : ''}
-                ${tree.location_description ? `<p style="margin: 0 0 4px 0; color: #666;"> ${tree.location_description}</p>` : ''}
-                ${tree.height_meters ? `<p style="margin: 0 0 4px 0; color: #666;"> Altura: ${tree.height_meters}m</p>` : ''}
-                <p style="margin: 0; color: #999; font-size: 12px;"> ${new Date(tree.created_at).toLocaleDateString()}</p>
+                ${tree.location_description ? `<p style="margin: 0 0 4px 0; color: #666;">📍 ${tree.location_description}</p>` : ''}
+                ${tree.height_meters ? `<p style="margin: 0 0 4px 0; color: #666;">📏 Altura: ${tree.height_meters}m</p>` : ''}
+                <p style="margin: 0; color: #999; font-size: 12px;">📅 ${new Date(tree.created_at).toLocaleDateString()}</p>
               </div>
             `);
           bounds.push([tree.latitude, tree.longitude]);
@@ -138,16 +210,25 @@ const MapScreen = () => {
     if (selectedFilter === 'all' || selectedFilter === 'animals') {
       animals.forEach((animal) => {
         if (animal.latitude && animal.longitude) {
-          const marker = window.L.marker([animal.latitude, animal.longitude])
+          const animalIcon = createCustomIcon('#CD853F', 'animal'); // Café claro para animales
+          const marker = window.L.marker([animal.latitude, animal.longitude], { icon: animalIcon })
             .addTo(map)
             .bindPopup(`
-              <div style="min-width: 200px;">
-                <h3 style="margin: 0 0 8px 0; color: #8b4513;"> ${animal.common_name}</h3>
+              <div style="min-width: 250px; max-width: 300px;">
+                ${animal.image_url ? `
+                  <div style="margin-bottom: 10px;">
+                    <img src="${animal.image_url}" 
+                         style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" 
+                         alt="${animal.common_name}"
+                         onerror="this.style.display='none';" />
+                  </div>
+                ` : ''}
+                <h3 style="margin: 0 0 8px 0; color: #8b4513;">🐾 ${animal.common_name}</h3>
                 ${animal.scientific_name ? `<p style="margin: 0 0 4px 0; font-style: italic; color: #666;">${animal.scientific_name}</p>` : ''}
                 ${animal.description ? `<p style="margin: 0 0 4px 0; color: #333;">${animal.description}</p>` : ''}
-                ${animal.location_description ? `<p style="margin: 0 0 4px 0; color: #666;"> ${animal.location_description}</p>` : ''}
-                ${animal.behavior_notes ? `<p style="margin: 0 0 4px 0; color: #666;"> ${animal.behavior_notes}</p>` : ''}
-                <p style="margin: 0; color: #999; font-size: 12px;"> ${new Date(animal.created_at).toLocaleDateString()}</p>
+                ${animal.location_description ? `<p style="margin: 0 0 4px 0; color: #666;">📍 ${animal.location_description}</p>` : ''}
+                ${animal.behavior_notes ? `<p style="margin: 0 0 4px 0; color: #666;">🐾 ${animal.behavior_notes}</p>` : ''}
+                <p style="margin: 0; color: #999; font-size: 12px;">📅 ${new Date(animal.created_at).toLocaleDateString()}</p>
               </div>
             `);
           bounds.push([animal.latitude, animal.longitude]);
@@ -197,7 +278,7 @@ const MapScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}> Mapa de Biodiversidad</Text>
+        <Text style={styles.title}>🗺️ Mapa de Biodiversidad</Text>
         <Text style={styles.subtitle}>
           {trees.length} árboles • {animals.length} animales registrados
         </Text>
@@ -228,8 +309,9 @@ const MapScreen = () => {
         <div
           ref={mapRef}
           style={{
-            height: 400,
+            height: 'calc(100vh - 200px)',
             margin: 20,
+            marginBottom: 20,
             borderRadius: 12,
             overflow: 'hidden',
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
@@ -242,50 +324,21 @@ const MapScreen = () => {
             Mapa interactivo disponible en web
           </Text>
           <Text style={styles.mapSubtext}>
-            Usa la versión web para ver el mapa interactivo
+            Usa la versión web para ver el mapa interactivo con marcadores temáticos
           </Text>
+          <View style={styles.legendContainer}>
+            <Text style={styles.legendTitle}>Leyenda:</Text>
+            <View style={styles.legendItem}>
+              <Text style={styles.legendIcon}>🌳</Text>
+              <Text style={styles.legendText}>Plantas aprobadas</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <Text style={styles.legendIcon}>🐾</Text>
+              <Text style={styles.legendText}>Animales aprobados</Text>
+            </View>
+          </View>
         </View>
       )}
-
-      <ScrollView style={styles.dataList}>
-        <Text style={styles.listTitle}>
-          {selectedFilter === 'trees' ? 'Árboles' : selectedFilter === 'animals' ? 'Animales' : 'Ubicaciones'}
-        </Text>
-        
-        {loading ? (
-          <Text style={styles.loadingText}>Cargando datos...</Text>
-        ) : getFilteredData().length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="location-outline" size={48} color="#6c757d" />
-            <Text style={styles.emptyText}>
-              No hay datos con ubicación
-            </Text>
-            <Text style={styles.emptySubtext}>
-              Los registros aparecerán aquí una vez que incluyan coordenadas
-            </Text>
-          </View>
-        ) : (
-          getFilteredData().map((item) => (
-            <TouchableOpacity key={`${item.id}-${item.common_name}`} style={styles.dataItem}>
-              <View style={styles.dataInfo}>
-                <Text style={styles.dataName}>
-                  {trees.includes(item) ? '' : ''} {item.common_name}
-                </Text>
-                {item.scientific_name && (
-                  <Text style={styles.dataScientific}>{item.scientific_name}</Text>
-                )}
-                <Text style={styles.dataLocation}>
-                  {item.location_description || `${parseFloat(item.latitude || 0).toFixed(4)}, ${parseFloat(item.longitude || 0).toFixed(4)}`}
-                </Text>
-                <Text style={styles.dataDate}>
-                  {new Date(item.created_at).toLocaleDateString()}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#6c757d" />
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
     </View>
   );
 };
@@ -420,6 +473,33 @@ const styles = StyleSheet.create({
   dataDate: {
     fontSize: 12,
     color: '#6c757d',
+  },
+  legendContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    alignSelf: 'center',
+  },
+  legendTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2d5016',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  legendIcon: {
+    fontSize: 20,
+    marginRight: 10,
+  },
+  legendText: {
+    fontSize: 14,
+    color: '#495057',
   },
 });
 

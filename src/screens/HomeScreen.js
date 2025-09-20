@@ -31,6 +31,29 @@ const HomeScreen = ({ navigation }) => {
   const [syncing, setSyncing] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const animation = useState(new Animated.Value(0))[0];
+  const scrollIndicatorAnimation = useState(new Animated.Value(0))[0];
+
+  // Animación continua para el indicador de scroll
+  useEffect(() => {
+    const startScrollAnimation = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scrollIndicatorAnimation, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scrollIndicatorAnimation, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    startScrollAnimation();
+  }, [scrollIndicatorAnimation]);
 
   useEffect(() => {
     console.log('🏠 [HomeScreen] Componente montado, iniciando sincronización automática...');
@@ -212,9 +235,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.greeting}>
             ¡Hola, {user?.full_name || user?.email?.split('@')[0] || 'Usuario'}!
           </Text>
-          <Text style={styles.subtitle}>
-            {user?.full_name || user?.email || 'Usuario sin email'}
-          </Text>
           {user?.role && (
             <Text style={styles.roleText}>
               {user.role === 'explorer' ? '🌱 Explorador' : 
@@ -310,13 +330,23 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           
-          <TouchableOpacity 
-            style={styles.exploreButton}
-            onPress={() => navigation.navigate('Explorer')}
-          >
-            <Ionicons name="search-outline" size={20} color="#ffffff" />
-            <Text style={styles.exploreButtonText}>Ver Todos los Registros</Text>
-          </TouchableOpacity>
+          {/* Indicador animado hacia abajo */}
+          <View style={styles.scrollIndicatorContainer}>
+            <Text style={styles.scrollIndicatorText}>Explora por categoría</Text>
+            <Animated.View style={[
+              styles.scrollIndicator,
+              {
+                transform: [{
+                  translateY: scrollIndicatorAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 8]
+                  })
+                }]
+              }
+            ]}>
+              <Ionicons name="chevron-down" size={24} color="#2d5016" />
+            </Animated.View>
+          </View>
         </View>
 
         {/* Botón especial para científicos y admins */}
@@ -646,6 +676,22 @@ const styles = StyleSheet.create({
   },
   fabMain: {
     zIndex: 20, // Asegurar que el botón principal esté encima
+  },
+  scrollIndicatorContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 15,
+  },
+  scrollIndicatorText: {
+    fontSize: 16,
+    color: '#2d5016',
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  scrollIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
