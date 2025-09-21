@@ -10,12 +10,7 @@ Una aplicación de biodiversidad construida con React Native y Expo, **SIN depen
 - ✅ **Web Compatible**: Funciona perfectamente en navegadores web
 
 ## 👥 Usuarios de Prueba
-
-Para desarrollo, puedes usar estos usuarios:
-
-- **Explorer**: `explorer@vibo.co` / `explorer123`
-- **Scientist**: `scientist@vibo.co` / `scientist123`  
-- **Admin**: `admin@vibo.co` / `admin123`
+N/S
 
 ## 🛠️ Instalación
 
