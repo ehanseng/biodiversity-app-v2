@@ -93,7 +93,7 @@ const ProfileScreen = ({ navigation }) => {
             </Text>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('ScientistApproval')}
+              onPress={() => navigation.navigate('Scientist')}
             >
               <Ionicons name="checkmark-done-circle" size={24} color="#007bff" />
               <Text style={styles.actionButtonText}>Revisión Científica</Text>

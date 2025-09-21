@@ -109,7 +109,7 @@ const MainTabs = () => {
         options={{ title: 'Animales' }}
       />
       
-      {profile?.role === 'scientist' && <Tab.Screen name="Scientist" component={ScientistScreen} />}
+      {profile?.role === 'scientist' && <Tab.Screen name="Scientist" component={ScientistApprovalScreen} options={{ title: 'Científico' }} />}
       {profile?.role === 'admin' && <Tab.Screen name="Admin" component={AdminScreen} />}
 
       <Tab.Screen 
@@ -140,7 +140,6 @@ const MainStack = () => (
     <Stack.Screen name="MainTabs" component={MainTabsWithMenu} />
     <Stack.Screen name="AddTree" component={AddTreeScreen} />
     <Stack.Screen name="AddAnimal" component={AddAnimalScreen} />
-    <Stack.Screen name="ScientistApproval" component={ScientistApprovalScreen} />
     <Stack.Screen name="MySQLTest" component={MySQLTestScreen} />
     
     {/* Biodiversity Explorers */}

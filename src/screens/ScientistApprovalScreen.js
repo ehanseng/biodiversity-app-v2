@@ -1,28 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-  Platform
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Platform } from 'react-native';
 import SafeImage from '../components/SafeImage';
 import { Ionicons } from '@expo/vector-icons';
-// Supabase removido - usando datos mock
 import { useAuth } from '../contexts/SimpleAuthContext';
+import SimpleTreeService from '../services/SimpleTreeService';
+import SimpleAnimalService from '../services/SimpleAnimalService';
+import RankingService from '../services/RankingService';
+import CustomHeader from '../components/CustomHeader';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
-import webNotifications from '../utils/WebNotifications';
 
 const ScientistApprovalScreen = ({ navigation }) => {
   const { user, profile } = useAuth();
-  const [trees, setTrees] = useState([]);
-  const [allTrees, setAllTrees] = useState([]); // Guardar todos los árboles para filtrar localmente
+  const [records, setRecords] = useState([]);
+  const [allRecords, setAllRecords] = useState([]); // Guardar todos los registros para filtrar localmente
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('pending'); // pending, approved, rejected, all
+  const [processingRecords, setProcessingRecords] = useState(new Set());
 
   useEffect(() => {
     if (profile?.role === 'scientist' || profile?.role === 'admin') {
@@ -32,94 +26,68 @@ const ScientistApprovalScreen = ({ navigation }) => {
 
   useEffect(() => {
     // Filtrar localmente cuando cambia el filtro
-    filterTrees();
-  }, [filter, allTrees]);
+    filterRecords();
+  }, [filter, allRecords]);
 
   const loadTrees = async () => {
     try {
       setLoading(true);
+      console.log('🔬 [ScientistApproval] Cargando registros para revisión...');
       
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Cargar árboles y animales en paralelo
+      const treeService = new SimpleTreeService();
+      const animalService = new SimpleAnimalService();
       
-      // Datos mock de árboles para aprobación
-      const mockTrees = [
-        {
-          id: 1,
-          common_name: 'Ceiba',
-          scientific_name: 'Ceiba pentandra',
-          height_meters: 25,
-          diameter_cm: 80,
-          status: 'pending',
-          user_id: '1',
-          created_at: new Date().toISOString(),
-          profiles: {
-            full_name: 'Explorer Usuario',
-            email: 'explorer@vibo.co'
-          }
-        },
-        {
-          id: 2,
-          common_name: 'Guayacán',
-          scientific_name: 'Tabebuia chrysantha',
-          height_meters: 15,
-          diameter_cm: 45,
-          status: 'approved',
-          user_id: '1',
-          created_at: new Date().toISOString(),
-          profiles: {
-            full_name: 'Explorer Usuario',
-            email: 'explorer@vibo.co'
-          }
-        }
+      const [treesData, animalsData] = await Promise.all([
+        treeService.getAllTrees(),
+        animalService.getAllAnimals()
+      ]);
+      
+      console.log('🌳 [ScientistApproval] Árboles obtenidos:', treesData.length);
+      console.log('🦋 [ScientistApproval] Animales obtenidos:', animalsData.length);
+      
+      // Combinar y marcar tipo
+      const combinedRecords = [
+        ...treesData.map(tree => ({ ...tree, type: 'flora', icon: '🌳' })),
+        ...animalsData.map(animal => ({ ...animal, type: 'fauna', icon: '🦋' }))
       ];
       
-      setAllTrees(mockTrees);
+      // Ordenar por fecha de creación (más recientes primero)
+      combinedRecords.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      console.log('📊 [ScientistApproval] Total registros combinados:', combinedRecords.length);
+      setAllRecords(combinedRecords);
+      
     } catch (error) {
-      console.error('Error loading trees:', error);
-      Alert.alert('Error', 'No se pudieron cargar los árboles');
+      console.error('❌ [ScientistApproval] Error cargando registros:', error);
+      Alert.alert('Error', 'No se pudieron cargar los registros para revisión');
     } finally {
       setLoading(false);
     }
   };
 
-  const filterTrees = () => {
-    let filtered = [...allTrees];
+  const filterRecords = () => {
+    let filtered = [...allRecords];
     
-    console.log(' [ScientistApproval] Filtrando árboles:', {
-      total: allTrees.length,
+    console.log('🔍 [ScientistApproval] Filtrando registros:', {
+      total: allRecords.length,
       filter: filter,
-      pending: allTrees.filter(t => t.approval_status === 'pending').length,
-      approved: allTrees.filter(t => t.approval_status === 'approved').length,
-      rejected: allTrees.filter(t => t.approval_status === 'rejected').length
+      pending: allRecords.filter(r => (r.status === 'pending' || r.approval_status === 'pending')).length,
+      approved: allRecords.filter(r => (r.status === 'approved' || r.approval_status === 'approved')).length,
+      rejected: allRecords.filter(r => (r.status === 'rejected' || r.approval_status === 'rejected')).length
     });
     
-    // Debug: mostrar algunos árboles para verificar estructura
-    if (allTrees.length > 0) {
-      console.log(' [ScientistApproval] Muestra de árboles:', 
-        allTrees.slice(0, 3).map(t => ({ id: t.id, name: t.common_name, status: t.approval_status }))
-      );
-    }
-    
     if (filter === 'pending') {
-      filtered = filtered.filter(tree => tree.approval_status === 'pending');
+      filtered = filtered.filter(record => record.status === 'pending' || record.approval_status === 'pending');
     } else if (filter === 'approved') {
-      filtered = filtered.filter(tree => tree.approval_status === 'approved');
+      filtered = filtered.filter(record => record.status === 'approved' || record.approval_status === 'approved');
     } else if (filter === 'rejected') {
-      filtered = filtered.filter(tree => tree.approval_status === 'rejected');
+      filtered = filtered.filter(record => record.status === 'rejected' || record.approval_status === 'rejected');
     }
     // Si es 'all', no filtramos
     
-    console.log(' [ScientistApproval] Árboles filtrados:', filtered.length);
-    
-    // Debug: mostrar árboles filtrados
-    if (filtered.length > 0) {
-      console.log(' [ScientistApproval] Muestra filtrada:', 
-        filtered.slice(0, 3).map(t => ({ id: t.id, name: t.common_name, status: t.approval_status }))
-      );
-    }
-    
-    setTrees(filtered);
+    console.log('✅ [ScientistApproval] Registros filtrados:', filtered.length);
+    setRecords(filtered);
   };
 
   const handleRefresh = async () => {
@@ -128,52 +96,65 @@ const ScientistApprovalScreen = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const approveTree = async (tree) => {
+  const approveRecord = async (record) => {
     try {
-      const { error } = await supabase
-        .from('trees')
-        .update({ 
-          approval_status: 'approved',
-          approved_by: user.id,
-          approved_at: new Date().toISOString()
+      console.log('✅ [ScientistApproval] Aprobando registro:', record.common_name, record.type);
+      
+      // Determinar qué endpoint usar según el tipo
+      const endpoint = record.type === 'flora' ? 'simple-trees-endpoint.php' : 'simple-animals-endpoint.php';
+      const response = await fetch(`https://explora.ieeetadeo.org/${endpoint}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: record.id,
+          status: 'approved'
         })
-        .eq('id', tree.id);
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
 
-      // Actualizar el árbol localmente en allTrees
-      const updatedAllTrees = allTrees.map(t => 
-        t.id === tree.id 
-          ? { ...t, approval_status: 'approved', approved_by: user.id, approved_at: new Date().toISOString() }
-          : t
+      // Actualizar el registro localmente
+      const updatedAllRecords = allRecords.map(r => 
+        r.id === record.id && r.type === record.type
+          ? { ...r, status: 'approved', approval_status: 'approved' }
+          : r
       );
-      setAllTrees(updatedAllTrees);
+      setAllRecords(updatedAllRecords);
 
-      // Mostrar notificación
-      webNotifications.showSuccess(
-        ' Árbol Aprobado',
-        `"${tree.common_name}" de ${tree.profiles?.full_name} ha sido aprobado`
+      // Actualizar puntos del usuario automáticamente
+      if (record.user_id) {
+        try {
+          await RankingService.updateUserPoints(record.user_id);
+          console.log('🏆 [ScientistApproval] Puntos actualizados para usuario:', record.user_id);
+        } catch (pointsError) {
+          console.warn('⚠️ [ScientistApproval] Error actualizando puntos:', pointsError);
+        }
+      }
+
+      Alert.alert(
+        '✅ Registro Aprobado',
+        `"${record.common_name}" ha sido aprobado exitosamente`
       );
-
-      // Emitir evento para actualizar otras pantallas
-      eventEmitter.emit(EVENTS.TREE_UPDATED, { tree: { ...tree, approval_status: 'approved' }, action: 'approved' });
       
     } catch (error) {
-      console.error('Error approving tree:', error);
-      Alert.alert('Error', 'No se pudo aprobar el árbol');
+      console.error('❌ [ScientistApproval] Error aprobando registro:', error);
+      Alert.alert('Error', 'No se pudo aprobar el registro');
     }
   };
 
-  const rejectTree = async (tree) => {
-    console.log(' [ScientistApproval] Iniciando rechazo de árbol:', tree.id, tree.common_name);
+  const rejectRecord = async (record) => {
+    console.log('🔴 [ScientistApproval] Iniciando rechazo de registro:', record);
     
-    // Usar window.confirm en web, Alert.alert en móvil
     const confirmReject = Platform.OS === 'web' 
-      ? window.confirm(`¿Estás seguro de que quieres rechazar "${tree.common_name}"?`)
+      ? window.confirm(`¿Estás seguro de que quieres rechazar "${record.common_name}"?`)
       : await new Promise((resolve) => {
           Alert.alert(
-            'Rechazar Árbol',
-            `¿Estás seguro de que quieres rechazar "${tree.common_name}"?`,
+            'Rechazar Registro',
+            `¿Estás seguro de que quieres rechazar "${record.common_name}"?`,
             [
               { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
               { text: 'Rechazar', style: 'destructive', onPress: () => resolve(true) }
@@ -181,74 +162,77 @@ const ScientistApprovalScreen = ({ navigation }) => {
           );
         });
 
-    if (!confirmReject) {
-      console.log(' [ScientistApproval] Rechazo cancelado por el usuario');
-      return;
-    }
+    console.log('🔴 [ScientistApproval] Confirmación de rechazo:', confirmReject);
+    if (!confirmReject) return;
+
+    // Marcar como procesando
+    const recordKey = `${record.type}-${record.id}`;
+    setProcessingRecords(prev => new Set([...prev, recordKey]));
 
     try {
-      console.log(' [ScientistApproval] Ejecutando rechazo en BD...');
+      console.log('❌ [ScientistApproval] Rechazando registro:', record.common_name, record.type);
       
-      const { error } = await supabase
-        .from('trees')
-        .update({ 
-          approval_status: 'rejected',
-          approved_by: user.id,
-          approved_at: new Date().toISOString()
+      // Determinar qué endpoint usar según el tipo
+      const endpoint = record.type === 'flora' ? 'simple-trees-endpoint.php' : 'simple-animals-endpoint.php';
+      const response = await fetch(`https://explora.ieeetadeo.org/${endpoint}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: record.id,
+          status: 'rejected'
         })
-        .eq('id', tree.id);
+      });
 
-      if (error) {
-        console.error(' [ScientistApproval] Error en BD:', error);
-        throw error;
+      console.log('🔴 [ScientistApproval] Respuesta del servidor:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔴 [ScientistApproval] Error del servidor:', errorText);
+        throw new Error(`Error HTTP: ${response.status} - ${errorText}`);
       }
 
-      console.log(' [ScientistApproval] Actualización en BD exitosa');
+      const result = await response.json();
+      console.log('🔴 [ScientistApproval] Resultado del rechazo:', result);
 
-      // Actualizar el árbol localmente en allTrees
-      console.log(' [ScientistApproval] Actualizando estado local...');
-      console.log(' [ScientistApproval] AllTrees antes:', allTrees.length);
-      
-      const updatedAllTrees = allTrees.map(t => {
-        if (t.id === tree.id) {
-          console.log(' [ScientistApproval] Actualizando árbol:', t.id, 'de', t.approval_status, 'a rejected');
-          return { ...t, approval_status: 'rejected', approved_by: user.id, approved_at: new Date().toISOString() };
-        }
-        return t;
-      });
-      
-      console.log(' [ScientistApproval] AllTrees después:', updatedAllTrees.length);
-      console.log(' [ScientistApproval] Árbol actualizado encontrado:', 
-        updatedAllTrees.find(t => t.id === tree.id)?.approval_status
+      // Actualizar el registro localmente
+      const updatedAllRecords = allRecords.map(r => 
+        r.id === record.id && r.type === record.type
+          ? { ...r, status: 'rejected', approval_status: 'rejected' }
+          : r
       );
-      
-      setAllTrees(updatedAllTrees);
+      setAllRecords(updatedAllRecords);
+      console.log('🔴 [ScientistApproval] Registro actualizado localmente');
 
-      // Mostrar notificación
-      webNotifications.showWarning(
-        ' Árbol Rechazado',
-        `"${tree.common_name}" de ${tree.profiles?.full_name} ha sido rechazado`
+      Alert.alert(
+        '❌ Registro Rechazado',
+        `"${record.common_name}" ha sido rechazado exitosamente`
       );
-
-      // Emitir evento para actualizar otras pantallas
-      eventEmitter.emit(EVENTS.TREE_UPDATED, { tree: { ...tree, approval_status: 'rejected' }, action: 'rejected' });
-      
-      console.log(' [ScientistApproval] Rechazo completado exitosamente');
       
     } catch (error) {
-      console.error(' [ScientistApproval] Error completo al rechazar:', error);
-      Alert.alert('Error', 'No se pudo rechazar el árbol: ' + error.message);
+      console.error('❌ [ScientistApproval] Error rechazando registro:', error);
+      Alert.alert('Error', 'No se pudo rechazar el registro');
+    } finally {
+      // Quitar del estado de procesando
+      setProcessingRecords(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(recordKey);
+        return newSet;
+      });
     }
   };
 
-  const changeToPending = async (tree) => {
-    // Usar window.confirm en web, Alert.alert en móvil
+  const changeToPending = async (record) => {
+    const currentStatus = record.status || record.approval_status;
+    const statusText = currentStatus === 'approved' ? 'aprobado' : 'rechazado';
+    
     const confirmChange = Platform.OS === 'web' 
-      ? window.confirm(`¿Quieres cambiar "${tree.common_name}" de ${tree.approval_status === 'approved' ? 'aprobado' : 'rechazado'} a pendiente?`)
+      ? window.confirm(`¿Quieres cambiar "${record.common_name}" de ${statusText} a pendiente?`)
       : await new Promise((resolve) => {
           Alert.alert(
             'Cambiar a Pendiente',
-            `¿Quieres cambiar "${tree.common_name}" de ${tree.approval_status === 'approved' ? 'aprobado' : 'rechazado'} a pendiente?`,
+            `¿Quieres cambiar "${record.common_name}" de ${statusText} a pendiente?`,
             [
               { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
               { text: 'Cambiar a Pendiente', onPress: () => resolve(true) }
@@ -256,174 +240,190 @@ const ScientistApprovalScreen = ({ navigation }) => {
           );
         });
 
-    if (!confirmChange) {
-      return;
-    }
+    if (!confirmChange) return;
 
     try {
-      const { error } = await supabase
-        .from('trees')
-        .update({ 
-          approval_status: 'pending',
-          approved_by: null,
-          approved_at: null
+      console.log('⏳ [ScientistApproval] Cambiando a pendiente:', record.common_name, record.type);
+      
+      // Determinar qué endpoint usar según el tipo
+      const endpoint = record.type === 'flora' ? 'simple-trees-endpoint.php' : 'simple-animals-endpoint.php';
+      const response = await fetch(`https://explora.ieeetadeo.org/${endpoint}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: record.id,
+          status: 'pending'
         })
-        .eq('id', tree.id);
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
 
-      // Actualizar el árbol localmente en allTrees
-      const updatedAllTrees = allTrees.map(t => 
-        t.id === tree.id 
-          ? { ...t, approval_status: 'pending', approved_by: null, approved_at: null }
-          : t
+      // Actualizar el registro localmente
+      const updatedAllRecords = allRecords.map(r => 
+        r.id === record.id && r.type === record.type
+          ? { ...r, status: 'pending', approval_status: 'pending' }
+          : r
       );
-      setAllTrees(updatedAllTrees);
+      setAllRecords(updatedAllRecords);
 
-      webNotifications.showInfo(
+      Alert.alert(
         '⏳ Estado Cambiado',
-        `"${tree.common_name}" ahora está pendiente de revisión`
+        `"${record.common_name}" ahora está pendiente de revisión`
       );
-
-      eventEmitter.emit(EVENTS.TREE_UPDATED, { tree: { ...tree, approval_status: 'pending' }, action: 'pending' });
+      
     } catch (error) {
-      console.error('Error changing status:', error);
+      console.error('❌ [ScientistApproval] Error cambiando estado:', error);
       Alert.alert('Error', 'No se pudo cambiar el estado');
     }
   };
 
-  const renderTreeItem = ({ item: tree }) => (
-    <View style={styles.treeCard}>
-      <View style={styles.treeHeader}>
-        <View style={styles.treeInfo}>
-          <Text style={styles.treeName}>{tree.common_name}</Text>
-          <Text style={styles.scientificName}>{tree.scientific_name}</Text>
-          <Text style={styles.submitter}>
-            {tree.profiles?.full_name || 'Usuario desconocido'}
-          </Text>
-          <Text style={styles.location}>
-            {tree.location_description || 'Sin ubicación'}
-          </Text>
-        </View>
-        
-        <View style={styles.statusBadge}>
-          <Text style={[
-            styles.statusText,
-            tree.approval_status === 'approved' ? styles.approved : 
-            tree.approval_status === 'rejected' ? styles.rejected : styles.pending
-          ]}>
-            {tree.approval_status === 'approved' ? ' Aprobado' :
-             tree.approval_status === 'rejected' ? ' Rechazado' : ' Pendiente'}
-          </Text>
-        </View>
-      </View>
+  const renderRecordItem = ({ item: record }) => {
+    const currentStatus = record.status || record.approval_status || 'pending';
+    
+    return (
+      <View style={styles.recordCard}>
+        <View style={styles.recordMainContent}>
+          {/* Foto lateral cuadrada */}
+          {record.image_url && (
+            <SafeImage 
+              source={{ uri: record.image_url }} 
+              style={styles.recordImageSide}
+              resizeMode="cover"
+            />
+          )}
+          
+          {/* Contenido principal */}
+          <View style={styles.recordContent}>
+            <View style={styles.recordHeader}>
+              <View style={styles.recordInfo}>
+                <View style={styles.recordTitle}>
+                  <Text style={styles.recordIcon}>{record.icon}</Text>
+                  <View style={styles.recordNames}>
+                    <Text style={styles.recordName}>{record.common_name}</Text>
+                    <Text style={styles.scientificName}>{record.scientific_name}</Text>
+                  </View>
+                </View>
+                <Text style={styles.submitter}>
+                  {record.user_name || 'Usuario desconocido'}
+                </Text>
+              </View>
+              
+              <View style={[
+                styles.statusBadge,
+                currentStatus === 'approved' ? styles.approvedBadge : 
+                currentStatus === 'rejected' ? styles.rejectedBadge : styles.pendingBadge
+              ]}>
+                <Text style={styles.statusText}>
+                  {currentStatus === 'approved' ? '✅ Aprobado' :
+                   currentStatus === 'rejected' ? '❌ Rechazado' : '⏳ Pendiente'}
+                </Text>
+              </View>
+            </View>
 
-      {tree.description && (
-        <Text style={styles.description} numberOfLines={2}>
-          {tree.description}
+            {record.description && (
+              <Text style={styles.description} numberOfLines={2}>
+                {record.description}
+              </Text>
+            )}
+
+            <View style={styles.recordDetails}>
+              {record.type === 'flora' && (
+                <>
+                  {record.height_meters && (
+                    <Text style={styles.detail}>📏 {record.height_meters}m</Text>
+                  )}
+                  {record.diameter_cm && (
+                    <Text style={styles.detail}>⭕ {record.diameter_cm}cm</Text>
+                  )}
+                  {record.family && (
+                    <Text style={styles.detail}>🌿 {record.family}</Text>
+                  )}
+                </>
+              )}
+              {record.type === 'fauna' && (
+                <>
+                  {record.animal_class && (
+                    <Text style={styles.detail}>🏷️ {record.animal_class}</Text>
+                  )}
+                  {record.habitat && (
+                    <Text style={styles.detail}>🏠 {record.habitat}</Text>
+                  )}
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.actionButtons}>
+          {currentStatus === 'pending' && (
+            <>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.approveButton]}
+                onPress={() => approveRecord(record)}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
+                <Text style={styles.actionButtonText}>Aprobar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, styles.rejectButton]}
+                onPress={() => rejectRecord(record)}
+              >
+                <Ionicons name="close-circle" size={20} color="#ffffff" />
+                <Text style={styles.actionButtonText}>Rechazar</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {(currentStatus === 'approved' || currentStatus === 'rejected') && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.pendingButton]}
+              onPress={() => changeToPending(record)}
+            >
+              <Ionicons name="time" size={20} color="#ffffff" />
+              <Text style={styles.actionButtonText}>Marcar Pendiente</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={styles.timestamp}>
+          {new Date(record.created_at).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
         </Text>
-      )}
-
-      <View style={styles.treeDetails}>
-        {tree.height && (
-          <Text style={styles.detail}> {tree.height}m</Text>
-        )}
-        {tree.diameter && (
-          <Text style={styles.detail}> {tree.diameter}cm</Text>
-        )}
-        {tree.health_status && (
-          <Text style={styles.detail}> {tree.health_status}</Text>
-        )}
       </View>
+    );
+  };
 
-      <View style={styles.actionButtons}>
-        {tree.approval_status === 'pending' && (
-          <>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.approveButton]}
-              onPress={() => approveTree(tree)}
-            >
-              <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Aprobar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.rejectButton]}
-              onPress={() => rejectTree(tree)}
-            >
-              <Ionicons name="close-circle" size={20} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Rechazar</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {tree.approval_status === 'approved' && (
-          <>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.pendingButton]}
-              onPress={() => changeToPending(tree)}
-            >
-              <Ionicons name="time" size={20} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Marcar Pendiente</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.rejectButton]}
-              onPress={() => rejectTree(tree)}
-            >
-              <Ionicons name="close-circle" size={20} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Rechazar</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {tree.approval_status === 'rejected' && (
-          <>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.approveButton]}
-              onPress={() => approveTree(tree)}
-            >
-              <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Aprobar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.pendingButton]}
-              onPress={() => changeToPending(tree)}
-            >
-              <Ionicons name="time" size={20} color="#ffffff" />
-              <Text style={styles.actionButtonText}>Marcar Pendiente</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-
-      <Text style={styles.timestamp}>
-        {new Date(tree.created_at).toLocaleDateString('es-ES', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })}
-      </Text>
-    </View>
-  );
-
-  const FilterButton = ({ filterKey, title, count }) => (
+  const FilterButton = ({ filterKey, title, count, iconName, iconColor }) => (
     <TouchableOpacity
       style={[
         styles.filterButton,
-        filter === filterKey && styles.activeFilter
+        filter === filterKey && styles.activeFilterButton
       ]}
       onPress={() => setFilter(filterKey)}
     >
-      <Text style={[
-        styles.filterButtonText,
-        filter === filterKey && styles.activeFilterText
-      ]}>
-        {title} ({count})
-      </Text>
+      <View style={styles.filterContent}>
+        <Ionicons 
+          name={iconName} 
+          size={20} 
+          color={filter === filterKey ? '#fff' : (iconColor || '#6c757d')} 
+        />
+        <Text style={[
+          styles.filterButtonText,
+          filter === filterKey && styles.activeFilterText
+        ]}>
+          {count}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 
@@ -439,81 +439,55 @@ const ScientistApprovalScreen = ({ navigation }) => {
     );
   }
 
-  const pendingCount = allTrees.filter(t => t.approval_status === 'pending').length;
-  const approvedCount = allTrees.filter(t => t.approval_status === 'approved').length;
-  const rejectedCount = allTrees.filter(t => t.approval_status === 'rejected').length;
-  const totalCount = allTrees.length;
+  const pendingCount = allRecords.filter(r => (r.status === 'pending' || r.approval_status === 'pending')).length;
+  const approvedCount = allRecords.filter(r => (r.status === 'approved' || r.approval_status === 'approved')).length;
+  const rejectedCount = allRecords.filter(r => (r.status === 'rejected' || r.approval_status === 'rejected')).length;
+  const totalCount = allRecords.length;
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.title}> Revisión Científica</Text>
-      </View>
+      <CustomHeader title="🔬 Revisión Científica" showBackButton={false} />
 
       <View style={styles.filtersContainer}>
-        <FilterButton filterKey="pending" title="Pendientes" count={pendingCount} />
-        <FilterButton filterKey="approved" title="Aprobados" count={approvedCount} />
-        <FilterButton filterKey="rejected" title="Rechazados" count={rejectedCount} />
-        <FilterButton filterKey="all" title="Todos" count={totalCount} />
+        <FilterButton filterKey="pending" title="Pendientes" count={pendingCount} iconName="time-outline" iconColor="#ffc107" />
+        <FilterButton filterKey="approved" title="Aprobados" count={approvedCount} iconName="checkmark-circle-outline" iconColor="#28a745" />
+        <FilterButton filterKey="rejected" title="Rechazados" count={rejectedCount} iconName="close-circle-outline" iconColor="#dc3545" />
+        <FilterButton filterKey="all" title="Todos" count={totalCount} iconName="flask-outline" iconColor="#007bff" />
       </View>
 
       <View style={styles.listWrapper}>
-        {/* Debug info */}
-        <Text style={styles.debugInfo}>
-          Mostrando {trees.length} árboles de {allTrees.length} totales (Filtro: {filter})
-        </Text>
-        
-        <ScrollView
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          contentContainerStyle={[
-            styles.listContainer,
-            { minHeight: trees.length * 200 } // Forzar altura mínima
-          ]}
-          showsVerticalScrollIndicator={true}
-          style={[
-            styles.flatList,
-            Platform.OS === 'web' && {
-              height: '100%',
-              maxHeight: 'calc(100vh - 200px)', // Altura específica para web
-              overflowY: 'scroll'
-            }
-          ]}
-          nestedScrollEnabled={true}
-        >
-          {trees.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="leaf-outline" size={64} color="#999" />
-              <Text style={styles.emptyText}>
-                {filter === 'pending' ? 'No hay árboles pendientes de revisión' :
-                 filter === 'approved' ? 'No hay árboles aprobados' :
-                 filter === 'rejected' ? 'No hay árboles rechazados' :
-                 'No hay árboles para revisar'}
-              </Text>
-            </View>
-          ) : (
-            trees.map((tree, index) => (
-              <View key={tree.id} style={styles.treeItemWrapper}>
-                <Text style={styles.itemDebug}>Elemento {index + 1} de {trees.length}</Text>
-                {renderTreeItem({ item: tree })}
-              </View>
-            ))
-          )}
-        </ScrollView>
+        {records.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="flask-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyTitle}>No hay registros</Text>
+            <Text style={styles.emptySubtitle}>
+              {filter === 'pending' ? 'No hay registros pendientes de revisión' :
+               filter === 'approved' ? 'No hay registros aprobados' :
+               filter === 'rejected' ? 'No hay registros rechazados' :
+               'No hay registros para revisar'}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={records}
+            renderItem={renderRecordItem}
+            keyExtractor={(item) => `${item.type}-${item.id}`}
+            style={styles.flatListStyle}
+            contentContainerStyle={styles.listContainer}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+            showsVerticalScrollIndicator={true}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+          />
+        )}
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
   header: {
     backgroundColor: '#2d5016',
     padding: 20,
@@ -541,31 +515,39 @@ const styles = StyleSheet.create({
   filterButton: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 15,
+    paddingHorizontal: 8,
     marginHorizontal: 5,
     borderRadius: 20,
     backgroundColor: '#f8f9fa',
     alignItems: 'center',
   },
-  activeFilter: {
+  activeFilterButton: {
     backgroundColor: '#2d5016',
   },
+  filterContent: {
+    alignItems: 'center',
+  },
   filterButtonText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: '#6c757d',
+    marginTop: 2,
   },
   activeFilterText: {
     color: '#ffffff',
   },
   listWrapper: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  listContainer: {
+  flatListStyle: {
+    flex: 1,
+  },
+  listContainer: { 
     padding: 15,
-    paddingBottom: 50, // Espacio extra al final
+    paddingBottom: 100, // Espacio extra para scroll completo
   },
-  treeCard: {
+  recordCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 15,
@@ -579,20 +561,52 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  treeHeader: {
+  recordMainContent: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    minHeight: 80, // Altura mínima para la tarjeta
+  },
+  recordImageSide: {
+    width: 80,
+    alignSelf: 'stretch', // Se ajusta al alto del contenedor
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  recordContent: {
+    flex: 1,
+    justifyContent: 'center', // Centra el contenido verticalmente
+  },
+  recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  treeInfo: {
+  recordInfo: {
     flex: 1,
   },
-  treeName: {
+  recordTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  recordIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  recordNames: {
+    flex: 1,
+  },
+  recordName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2d5016',
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  recordDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 15,
   },
   scientificName: {
     fontSize: 14,
@@ -611,22 +625,24 @@ const styles = StyleSheet.create({
   },
   statusBadge: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#f8f9fa',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  approvedBadge: {
+    backgroundColor: '#d4edda',
+  },
+  rejectedBadge: {
+    backgroundColor: '#f8d7da',
+  },
+  pendingBadge: {
+    backgroundColor: '#fff3cd',
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  approved: {
-    color: '#28a745',
-  },
-  rejected: {
-    color: '#dc3545',
-  },
-  pending: {
-    color: '#ffc107',
+    color: '#333',
   },
   description: {
     fontSize: 14,
@@ -680,17 +696,9 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'right',
   },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 50,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 15,
-  },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#666', marginTop: 16 },
+  emptySubtitle: { fontSize: 14, color: '#999', textAlign: 'center', marginTop: 8 },
   noAccessContainer: {
     flex: 1,
     alignItems: 'center',
@@ -704,32 +712,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-  flatList: {
-    flex: 1,
-  },
-  debugInfo: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-    paddingHorizontal: 15,
-  },
-  treeItemWrapper: {
-    marginBottom: 15,
-  },
-  itemDebug: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 5,
-  },
-  endMarker: {
-    height: 20,
-    backgroundColor: '#f8f9fa',
-  },
-  endText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  }
 });
 
 export default ScientistApprovalScreen;

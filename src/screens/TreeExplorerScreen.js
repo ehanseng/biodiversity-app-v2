@@ -99,57 +99,57 @@ const TreeExplorerScreen = ({ navigation }) => {
   };
 
   const renderTreeItem = ({ item: tree }) => {
-    // Debug: Ver qué campos están disponibles
-    if (filter === 'all') {
-      console.log('🔍 [TreeExplorer] Campos disponibles:', Object.keys(tree));
-      console.log('🔍 [TreeExplorer] user_name:', tree.user_name);
-    }
-    
     return (
       <TouchableOpacity style={styles.treeCard}>
-      <View style={styles.treeHeader}>
-        <View style={styles.treeInfo}>
-          <Text style={styles.treeName}>{tree.common_name}</Text>
-          <Text style={styles.scientificName}>{tree.scientific_name}</Text>
-          <Text style={styles.treeFamily}>Familia: {tree.family}</Text>
-        </View>
-        
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(tree) }]}>
-          <Text style={styles.statusText}>{getStatusText(tree)}</Text>
-        </View>
-      </View>
-
-      {tree.image_url && (
-        <SafeImage 
-          source={{ uri: tree.image_url }} 
-          style={styles.treeImage}
-          resizeMode="cover"
-        />
-      )}
-
-      <View style={styles.treeFooter}>
-        <View style={styles.locationInfo}>
-          <Ionicons name="location-outline" size={16} color="#666" />
-          <Text style={styles.locationText}>
-            {parseFloat(tree.latitude || 0).toFixed(4)}, {parseFloat(tree.longitude || 0).toFixed(4)}
-          </Text>
-        </View>
-        
-        <View style={styles.footerRight}>
-          {filter === 'all' && (tree.user_name || tree.full_name || tree.user_id) && (
-            <View style={styles.explorerInfo}>
-              <Ionicons name="person-outline" size={14} color="#28a745" />
-              <Text style={styles.explorerText}>
-                {tree.user_name || tree.full_name || `Usuario ${tree.user_id}`}
-              </Text>
-            </View>
+        <View style={styles.treeMainContent}>
+          {/* Foto lateral cuadrada */}
+          {tree.image_url && (
+            <SafeImage 
+              source={{ uri: tree.image_url }} 
+              style={styles.treeImageSide}
+              resizeMode="cover"
+            />
           )}
-          <Text style={styles.dateText}>
-            {new Date(tree.created_at).toLocaleDateString()}
-          </Text>
+          
+          {/* Contenido principal */}
+          <View style={styles.treeContent}>
+            <View style={styles.treeHeader}>
+              <View style={styles.treeInfo}>
+                <Text style={styles.treeName}>{tree.common_name}</Text>
+                <Text style={styles.scientificName}>{tree.scientific_name}</Text>
+                <Text style={styles.treeFamily}>Familia: {tree.family}</Text>
+              </View>
+              
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(tree) }]}>
+                <Text style={styles.statusText}>{getStatusText(tree)}</Text>
+              </View>
+            </View>
+
+            <View style={styles.treeFooter}>
+              <View style={styles.locationInfo}>
+                <Ionicons name="location-outline" size={16} color="#666" />
+                <Text style={styles.locationText}>
+                  {parseFloat(tree.latitude || 0).toFixed(4)}, {parseFloat(tree.longitude || 0).toFixed(4)}
+                </Text>
+              </View>
+              
+              <View style={styles.footerRight}>
+                {filter === 'all' && (tree.user_name || tree.full_name || tree.user_id) && (
+                  <View style={styles.explorerInfo}>
+                    <Ionicons name="person-outline" size={14} color="#28a745" />
+                    <Text style={styles.explorerText}>
+                      {tree.user_name || tree.full_name || `Usuario ${tree.user_id}`}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.dateText}>
+                  {new Date(tree.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
@@ -241,16 +241,18 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 12, fontWeight: '600', color: '#6c757d', marginTop: 2 },
   activeFilterText: { color: '#fff' },
   listContainer: { padding: 15 },
-  treeCard: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  treeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 15 },
+  treeCard: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, padding: 15 },
+  treeMainContent: { flexDirection: 'row', minHeight: 80 },
+  treeImageSide: { width: 80, alignSelf: 'stretch', borderRadius: 8, marginRight: 12 },
+  treeContent: { flex: 1, justifyContent: 'center' },
+  treeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   treeInfo: { flex: 1 },
   treeName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   scientificName: { fontSize: 14, fontStyle: 'italic', color: '#666', marginTop: 2 },
   treeFamily: { fontSize: 12, color: '#888', marginTop: 4 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 10, fontWeight: 'bold', color: '#fff' },
-  treeImage: { width: '100%', height: 200 },
-  treeFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15 },
+  treeFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   locationInfo: { flexDirection: 'row', alignItems: 'center' },
   locationText: { fontSize: 12, color: '#666', marginLeft: 4 },
   footerRight: { alignItems: 'flex-end' },

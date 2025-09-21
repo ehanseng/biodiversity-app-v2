@@ -94,57 +94,57 @@ const AnimalExplorerScreen = ({ navigation }) => {
   };
 
   const renderAnimalItem = ({ item: animal }) => {
-    // Debug: Ver qué campos están disponibles
-    if (filter === 'all') {
-      console.log('🔍 [AnimalExplorer] Campos disponibles:', Object.keys(animal));
-      console.log('🔍 [AnimalExplorer] user_name:', animal.user_name);
-    }
-    
     return (
       <TouchableOpacity style={styles.animalCard}>
-      <View style={styles.animalHeader}>
-        <View style={styles.animalInfo}>
-          <Text style={styles.animalName}>{animal.common_name}</Text>
-          <Text style={styles.scientificName}>{animal.scientific_name}</Text>
-          <Text style={styles.animalClass}>Clase: {animal.animal_class}</Text>
-        </View>
-        
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(animal) }]}>
-          <Text style={styles.statusText}>{getStatusText(animal)}</Text>
-        </View>
-      </View>
-
-      {animal.image_url && (
-        <SafeImage 
-          source={{ uri: animal.image_url }} 
-          style={styles.animalImage}
-          resizeMode="cover"
-        />
-      )}
-
-      <View style={styles.animalFooter}>
-        <View style={styles.locationInfo}>
-          <Ionicons name="location-outline" size={16} color="#666" />
-          <Text style={styles.locationText}>
-            {parseFloat(animal.latitude || 0).toFixed(4)}, {parseFloat(animal.longitude || 0).toFixed(4)}
-          </Text>
-        </View>
-        
-        <View style={styles.footerRight}>
-          {filter === 'all' && (animal.user_name || animal.full_name || animal.user_id) && (
-            <View style={styles.explorerInfo}>
-              <Ionicons name="person-outline" size={14} color="#CD853F" />
-              <Text style={styles.explorerText}>
-                {animal.user_name || animal.full_name || `Usuario ${animal.user_id}`}
-              </Text>
-            </View>
+        <View style={styles.animalMainContent}>
+          {/* Foto lateral cuadrada */}
+          {animal.image_url && (
+            <SafeImage 
+              source={{ uri: animal.image_url }} 
+              style={styles.animalImageSide}
+              resizeMode="cover"
+            />
           )}
-          <Text style={styles.dateText}>
-            {new Date(animal.created_at).toLocaleDateString()}
-          </Text>
+          
+          {/* Contenido principal */}
+          <View style={styles.animalContent}>
+            <View style={styles.animalHeader}>
+              <View style={styles.animalInfo}>
+                <Text style={styles.animalName}>{animal.common_name}</Text>
+                <Text style={styles.scientificName}>{animal.scientific_name}</Text>
+                <Text style={styles.animalClass}>Clase: {animal.animal_class}</Text>
+              </View>
+              
+              <View style={[styles.statusBadge, { backgroundColor: getStatusColor(animal) }]}>
+                <Text style={styles.statusText}>{getStatusText(animal)}</Text>
+              </View>
+            </View>
+
+            <View style={styles.animalFooter}>
+              <View style={styles.locationInfo}>
+                <Ionicons name="location-outline" size={16} color="#666" />
+                <Text style={styles.locationText}>
+                  {parseFloat(animal.latitude || 0).toFixed(4)}, {parseFloat(animal.longitude || 0).toFixed(4)}
+                </Text>
+              </View>
+              
+              <View style={styles.footerRight}>
+                {filter === 'all' && (animal.user_name || animal.full_name || animal.user_id) && (
+                  <View style={styles.explorerInfo}>
+                    <Ionicons name="person-outline" size={14} color="#CD853F" />
+                    <Text style={styles.explorerText}>
+                      {animal.user_name || animal.full_name || `Usuario ${animal.user_id}`}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.dateText}>
+                  {new Date(animal.created_at).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
@@ -236,16 +236,18 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 12, fontWeight: '600', color: '#6c757d', marginTop: 2 },
   activeFilterText: { color: '#fff' },
   listContainer: { padding: 15 },
-  animalCard: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  animalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 15 },
+  animalCard: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, padding: 15 },
+  animalMainContent: { flexDirection: 'row', minHeight: 80 },
+  animalImageSide: { width: 80, alignSelf: 'stretch', borderRadius: 8, marginRight: 12 },
+  animalContent: { flex: 1, justifyContent: 'center' },
+  animalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   animalInfo: { flex: 1 },
   animalName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   scientificName: { fontSize: 14, fontStyle: 'italic', color: '#666', marginTop: 2 },
   animalClass: { fontSize: 12, color: '#888', marginTop: 4 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 10, fontWeight: 'bold', color: '#fff' },
-  animalImage: { width: '100%', height: 200 },
-  animalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15 },
+  animalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   locationInfo: { flexDirection: 'row', alignItems: 'center' },
   locationText: { fontSize: 12, color: '#666', marginLeft: 4 },
   footerRight: { alignItems: 'flex-end' },

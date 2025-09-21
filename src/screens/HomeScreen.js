@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Animated, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
@@ -347,21 +347,6 @@ const HomeScreen = ({ navigation }) => {
           </Animated.View>
         </View>
 
-        {/* Botón especial para científicos y admins */}
-        {(user?.role === 'scientist' || user?.role === 'admin') && (
-          <View style={styles.actionsContainer}>
-            <Text style={styles.sectionTitle}>Panel de Revisión</Text>
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.scientistButton]}
-              onPress={() => navigation.navigate('ScientistApproval')}
-            >
-              <Ionicons name="checkmark-done-circle" size={24} color="#ffffff" />
-              <Text style={styles.actionButtonText}>
-                🔬 Revisión Científica
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
 
       {/* Menú FAB Animado Definitivo */}
@@ -375,7 +360,10 @@ const HomeScreen = ({ navigation }) => {
 
         {/* Botones secundarios (se renderizan encima) */}
         <Animated.View style={[styles.secondaryFab, { zIndex: 10, transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -120] }) }] }]}>
-          <TouchableOpacity onPress={() => navigation.navigate('AddTree')}>
+          <TouchableOpacity onPress={() => {
+            toggleFabMenu();
+            setTimeout(() => navigation.navigate('AddTree'), 200);
+          }}>
             <View style={styles.fab}>
               <Ionicons name="leaf" size={24} color="#ffffff" />
             </View>
@@ -383,7 +371,10 @@ const HomeScreen = ({ navigation }) => {
         </Animated.View>
 
         <Animated.View style={[styles.secondaryFab, { zIndex: 10, transform: [{ scale: animation }, { translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [0, -60] }) }] }]}>
-          <TouchableOpacity onPress={() => navigation.navigate('AddAnimal')}>
+          <TouchableOpacity onPress={() => {
+            toggleFabMenu();
+            setTimeout(() => navigation.navigate('AddAnimal'), 200);
+          }}>
             <View style={styles.fab}>
               <Ionicons name="paw" size={24} color="#ffffff" />
             </View>
@@ -648,9 +639,6 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#2d5016',
-  },
-  scientistButton: {
-    backgroundColor: '#007bff',
   },
   fabContainer: {
     position: 'absolute',
