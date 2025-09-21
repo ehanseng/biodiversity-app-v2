@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform, Image, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SafeImage from '../components/SafeImage';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import MobileImagePicker from '../components/MobileImagePicker';
+// import MobileImagePicker from '../components/MobileImagePicker'; // Temporalmente deshabilitado
 // Supabase removido - usando sistema simple
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleAnimalService from '../services/SimpleAnimalService';
@@ -12,9 +13,11 @@ import useToast from '../hooks/useToast';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import DynamicMapView from '../components/DynamicMapView';
 import webNotifications from '../utils/WebNotifications';
+import usePageTitle from '../hooks/usePageTitle';
 
 const AddAnimalScreen = ({ navigation }) => {
   const { user } = useAuth();
+  usePageTitle('Registrar Animal'); // Actualizar título de la página
   const { toast, showSuccess, showError, showWarning, hideToast } = useToast();
   const [formData, setFormData] = useState({
     common_name: '',
@@ -130,8 +133,9 @@ const AddAnimalScreen = ({ navigation }) => {
   };
 
   const takePhoto = async () => {
-    // Solo usar MobileImagePicker en móvil web, en desktop usar lógica original
-    if (Platform.OS === 'web' && MobileImagePicker.isMobileWeb()) {
+    // Temporalmente deshabilitado MobileImagePicker para evitar conflictos
+    /*
+    if (Platform.OS === 'web' && false) { // MobileImagePicker.isMobileWeb()
       try {
         const result = await MobileImagePicker.takePhoto();
         
@@ -147,6 +151,7 @@ const AddAnimalScreen = ({ navigation }) => {
       }
       return;
     }
+    */
 
     // Lógica original para desktop y app nativa
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -177,8 +182,9 @@ const AddAnimalScreen = ({ navigation }) => {
   };
 
   const pickFromGallery = async () => {
-    // Solo usar MobileImagePicker en móvil web, en desktop usar lógica original
-    if (Platform.OS === 'web' && MobileImagePicker.isMobileWeb()) {
+    // Temporalmente deshabilitado MobileImagePicker para evitar conflictos
+    /*
+    if (Platform.OS === 'web' && false) { // MobileImagePicker.isMobileWeb()
       try {
         const result = await MobileImagePicker.pickFromGallery();
         
@@ -194,6 +200,7 @@ const AddAnimalScreen = ({ navigation }) => {
       }
       return;
     }
+    */
 
     // Lógica original para desktop y app nativa
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -393,7 +400,7 @@ const AddAnimalScreen = ({ navigation }) => {
             <Ionicons name="camera" size={20} color="#2d5016" />
             <Text style={styles.imagePickerButtonText}>Seleccionar Foto</Text>
           </TouchableOpacity>
-          {image && <Image source={{ uri: image }} style={styles.imagePreview} />}
+          {image && <SafeImage source={{ uri: image }} style={styles.imagePreview} />}
 
           {/* Sección de Ubicación */}
           <View style={styles.inputGroup}>

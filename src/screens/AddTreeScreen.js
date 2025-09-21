@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform, Image, KeyboardAvoidingView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SafeImage from '../components/SafeImage';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import MobileImagePicker from '../components/MobileImagePicker';
+// import MobileImagePicker from '../components/MobileImagePicker'; // Temporalmente deshabilitado
 // Supabase removido - usando sistema simple
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
@@ -12,9 +13,11 @@ import useToast from '../hooks/useToast';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 import DynamicMapView from '../components/DynamicMapView';
 import webNotifications from '../utils/WebNotifications';
+import usePageTitle from '../hooks/usePageTitle';
 
 const AddTreeScreen = ({ navigation }) => {
   const { user } = useAuth();
+  usePageTitle('Registrar Planta'); // Actualizar título de la página
   const { toast, showSuccess, showError, showWarning, hideToast } = useToast();
   const [formData, setFormData] = useState({
     common_name: '',
@@ -191,8 +194,10 @@ const AddTreeScreen = ({ navigation }) => {
   };
 
   const takePhoto = async () => {
-    // Solo usar MobileImagePicker en móvil web, en desktop usar lógica original
-    if (Platform.OS === 'web' && MobileImagePicker.isMobileWeb()) {
+    // Temporalmente deshabilitado MobileImagePicker para evitar conflictos
+    // TODO: Revisar conflicto con Image constructor
+    /*
+    if (Platform.OS === 'web' && false) { // MobileImagePicker.isMobileWeb()
       try {
         const result = await MobileImagePicker.takePhoto();
         
@@ -208,6 +213,7 @@ const AddTreeScreen = ({ navigation }) => {
       }
       return;
     }
+    */
 
     // Lógica original para desktop y app nativa
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -238,8 +244,10 @@ const AddTreeScreen = ({ navigation }) => {
   };
 
   const pickFromGallery = async () => {
-    // Solo usar MobileImagePicker en móvil web, en desktop usar lógica original
-    if (Platform.OS === 'web' && MobileImagePicker.isMobileWeb()) {
+    // Temporalmente deshabilitado MobileImagePicker para evitar conflictos
+    // TODO: Revisar conflicto con Image constructor
+    /*
+    if (Platform.OS === 'web' && false) { // MobileImagePicker.isMobileWeb()
       try {
         const result = await MobileImagePicker.pickFromGallery();
         
@@ -255,6 +263,7 @@ const AddTreeScreen = ({ navigation }) => {
       }
       return;
     }
+    */
 
     // Lógica original para desktop y app nativa
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -551,7 +560,7 @@ const AddTreeScreen = ({ navigation }) => {
           </TouchableOpacity>
           {image && (
             <View style={styles.imagePreviewContainer}>
-              <Image source={{ uri: image }} style={styles.imagePreview} />
+              <SafeImage source={{ uri: image }} style={styles.imagePreview} />
               <TouchableOpacity style={styles.removeImageButton} onPress={() => setImage(null)}>
                 <Ionicons name="close-circle" size={24} color="#dc3545" />
               </TouchableOpacity>

@@ -1,21 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  RefreshControl,
-  Animated,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
+import SimpleAnimalService from '../services/SimpleAnimalService';
+import usePageTitle from '../hooks/usePageTitle';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
+  usePageTitle('Home'); // Actualizar título de la página
   const [refreshing, setRefreshing] = useState(false);
   const [treeStats, setTreeStats] = useState({
     totalTrees: 0,

@@ -9,8 +9,8 @@ import {
   Alert,
   Animated,
   Platform,
-  Image,
 } from 'react-native';
+import SafeImage from '../components/SafeImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
@@ -327,7 +327,7 @@ ${tree.description || ''}`,
         <View style={styles.treeCardContent}>
           {/* Imagen del registro */}
           <View style={styles.treeImageContainer}>
-            <Image
+            <SafeImage
               source={{ 
                 uri: tree.image_url && !tree.image_url.startsWith('blob:') 
                   ? tree.image_url 

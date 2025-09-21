@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import CustomHeader from '../components/CustomHeader';
 import SimpleTreeService from '../services/SimpleTreeService';
 import SimpleAnimalService from '../services/SimpleAnimalService';
+import usePageTitle from '../hooks/usePageTitle';
 
 const MapScreen = () => {
+  usePageTitle('Mapa'); // Actualizar título de la página
   const [trees, setTrees] = useState([]);
   const [animals, setAnimals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -277,9 +280,9 @@ const MapScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>🗺️ Mapa de Biodiversidad</Text>
-        <Text style={styles.subtitle}>
+      <CustomHeader title="🗺️ Mapa de Biodiversidad" showBackButton={false} />
+      <View style={styles.statsContainer}>
+        <Text style={styles.statsText}>
           {trees.length} árboles • {animals.length} animales registrados
         </Text>
       </View>
@@ -348,21 +351,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  header: {
-    backgroundColor: '#2d5016',
-    padding: 20,
+  statsContainer: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 5,
-  },
-  subtitle: {
+  statsText: {
     fontSize: 16,
-    color: '#ffffff',
-    opacity: 0.9,
+    color: '#6c757d',
+    fontWeight: '500',
   },
   filterContainer: {
     flexDirection: 'row',

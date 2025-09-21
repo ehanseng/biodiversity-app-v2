@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  
+  <!-- PWA Meta Tags -->
+  <meta name="application-name" content="Explora Tadeo" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Explora Tadeo" />
+  <meta name="description" content="Plataforma para el registro y monitoreo de la biodiversidad en el campus de la Universidad Tadeo Lozano" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#2d5016" />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
+  <link rel="apple-touch-icon" sizes="144x144" href="/apple-touch-icon-144x144.png" />
+  <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png" />
+  <link rel="apple-touch-icon" sizes="114x114" href="/apple-touch-icon-114x114.png" />
+  <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon-76x76.png" />
+  <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-72x72.png" />
+  <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png" />
+  <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png" />
+  
+  <!-- Android Chrome Icons -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+  
+  <!-- Windows Tiles -->
+  <meta name="msapplication-TileColor" content="#2d5016" />
+  <meta name="msapplication-TileImage" content="/mstile-144x144.png" />
+  <meta name="msapplication-config" content="/browserconfig.xml" />
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Explora Tadeo - Biodiversidad" />
+  <meta property="og:description" content="Plataforma para el registro y monitoreo de la biodiversidad en el campus de la Universidad Tadeo Lozano" />
+  <meta property="og:image" content="/og-image.png" />
+  <meta property="og:url" content="https://biodiversidad.tadeo.edu.co" />
+  <meta property="og:site_name" content="Explora Tadeo" />
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Explora Tadeo - Biodiversidad" />
+  <meta name="twitter:description" content="Plataforma para el registro y monitoreo de la biodiversidad" />
+  <meta name="twitter:image" content="/og-image.png" />
+  
+  <title>Explora Tadeo</title>
+  
+  <style>
+    /* Loading screen styles */
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #2d5016;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .tree-icon {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    
+    .loading-text {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    
+    .loading-subtitle {
+      font-size: 14px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="tree-icon">🌳</div>
+    <div class="loading-text">Explora Tadeo</div>
+    <div class="loading-subtitle">Cargando biodiversidad...</div>
+  </div>
+
+  <!-- Root element for React -->
+  <div id="root"></div>
+  
+  <!-- Remove loading screen when app loads -->
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+          loadingScreen.style.opacity = '0';
+          loadingScreen.style.transition = 'opacity 0.5s ease-out';
+          setTimeout(function() {
+            loadingScreen.remove();
+          }, 500);
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>

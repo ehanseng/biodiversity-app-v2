@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
-  Image,
   Platform
 } from 'react-native';
+import SafeImage from '../components/SafeImage';
 import { Ionicons } from '@expo/vector-icons';
 // Supabase removido - usando datos mock
 import { useAuth } from '../contexts/SimpleAuthContext';

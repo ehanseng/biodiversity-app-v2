@@ -1,22 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-  Animated,
-  Platform,
-  Image,
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SafeImage from '../components/SafeImage';
+import CustomHeader from '../components/CustomHeader';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
+import usePageTitle from '../hooks/usePageTitle';
 
 const TreeExplorerScreen = ({ navigation }) => {
   const { user } = useAuth();
+  usePageTitle('Plantas'); // Actualizar título de la página
   
   const [trees, setTrees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +113,7 @@ const TreeExplorerScreen = ({ navigation }) => {
       </View>
 
       {tree.image_url && (
-        <Image 
+        <SafeImage 
           source={{ uri: tree.image_url }} 
           style={styles.treeImage}
           resizeMode="cover"
@@ -182,6 +175,7 @@ const TreeExplorerScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <CustomHeader title="Plantas" showBackButton={false} />
       <View style={styles.filtersContainer}>
         <FilterButton filterKey="all" title="Todos" count={allCount} iconName="earth-outline" iconColor="#007bff" />
         <FilterButton filterKey="mine" title="Míos" count={myTreesCount} iconName="person-outline" iconColor="#6f42c1" />

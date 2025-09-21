@@ -15,7 +15,32 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "name": "Explora Tadeo - Biodiversidad",
+      "shortName": "Explora Tadeo",
+      "lang": "es",
+      "scope": "/",
+      "startUrl": "/",
+      "display": "standalone",
+      "orientation": "portrait",
+      "themeColor": "#2d5016",
+      "backgroundColor": "#2d5016",
+      "description": "Plataforma para el registro y monitoreo de la biodiversidad en el campus de la Universidad Tadeo Lozano",
+      "categories": ["education", "science", "environment"],
+      "icons": [
+        {
+          "src": "./assets/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any maskable"
+        },
+        {
+          "src": "./assets/icon-512.png",
+          "sizes": "512x512",
+          "type": "image/png",
+          "purpose": "any maskable"
+        }
+      ]
     },
     "extra": {
       "social": {

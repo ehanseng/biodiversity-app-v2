@@ -1,22 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-  Animated,
-  Platform,
-  Image,
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SafeImage from '../components/SafeImage';
+import CustomHeader from '../components/CustomHeader';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleAnimalService from '../services/SimpleAnimalService';
+import usePageTitle from '../hooks/usePageTitle';
 
 const AnimalExplorerScreen = ({ navigation }) => {
   const { user } = useAuth();
+  usePageTitle('Animales'); // Actualizar título de la página
   
   const [animals, setAnimals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -115,7 +108,7 @@ const AnimalExplorerScreen = ({ navigation }) => {
       </View>
 
       {animal.image_url && (
-        <Image 
+        <SafeImage 
           source={{ uri: animal.image_url }} 
           style={styles.animalImage}
           resizeMode="cover"
@@ -177,6 +170,7 @@ const AnimalExplorerScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <CustomHeader title="Animales" showBackButton={false} />
       <View style={styles.filtersContainer}>
         <FilterButton filterKey="all" title="Todos" count={allCount} iconName="earth-outline" iconColor="#007bff" />
         <FilterButton filterKey="mine" title="Míos" count={myAnimalsCount} iconName="person-outline" iconColor="#6f42c1" />

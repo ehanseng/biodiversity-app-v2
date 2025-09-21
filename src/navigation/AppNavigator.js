@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import LoadingScreen from '../components/LoadingScreen';
+import DeepLinkHandler from '../components/DeepLinkHandler';
 import { StyleSheet } from 'react-native';
 
 // Auth Screens
@@ -49,7 +50,7 @@ const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: true,
+        headerShown: false, // Deshabilitar headers para evitar conflictos con títulos personalizados
         headerStyle: {
           backgroundColor: '#2d5016',
         },
@@ -92,7 +93,11 @@ const MainTabs = () => {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeScreen}
+        options={{ title: 'Home' }}
+      />
       <Tab.Screen 
         name="Plantas" 
         component={TreeExplorerScreen}
@@ -112,13 +117,22 @@ const MainTabs = () => {
         component={MapScreen}
         options={{ title: 'Mapa' }}
       />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{ title: 'Perfil' }}
+      />
     </Tab.Navigator>
   );
 };
 
 const MainTabsWithMenu = () => {
-  return <MainTabs />;
+  return (
+    <>
+      <DeepLinkHandler />
+      <MainTabs />
+    </>
+  );
 };
 
 const MainStack = () => (

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generador de Favicons - Explora Tadeo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 10px;
+            border-radius: 8px;
+        }
+        .size-label {
+            font-weight: bold;
+            margin: 10px;
+            color: #2d5016;
+        }
+        .download-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        button {
+            background: #2d5016;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1a3009;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌳 Generador de Favicons - Explora Tadeo</h1>
+        <p>Este script genera todos los tamaños de favicon necesarios para la PWA.</p>
+        
+        <div id="canvases"></div>
+        
+        <div class="download-section">
+            <h3>Descargar Favicons:</h3>
+            <div id="download-links"></div>
+            <button onclick="downloadAll()">Descargar Todos</button>
+        </div>
+    </div>
+
+    <script>
+        const sizes = [
+            { size: 16, name: 'favicon-16x16.png' },
+            { size: 32, name: 'favicon-32x32.png' },
+            { size: 57, name: 'apple-touch-icon-57x57.png' },
+            { size: 60, name: 'apple-touch-icon-60x60.png' },
+            { size: 72, name: 'apple-touch-icon-72x72.png' },
+            { size: 76, name: 'apple-touch-icon-76x76.png' },
+            { size: 114, name: 'apple-touch-icon-114x114.png' },
+            { size: 120, name: 'apple-touch-icon-120x120.png' },
+            { size: 144, name: 'apple-touch-icon-144x144.png' },
+            { size: 152, name: 'apple-touch-icon-152x152.png' },
+            { size: 180, name: 'apple-touch-icon.png' },
+            { size: 192, name: 'android-chrome-192x192.png' },
+            { size: 512, name: 'android-chrome-512x512.png' }
+        ];
+
+        function drawTreeIcon(ctx, size) {
+            const center = size / 2;
+            const scale = size / 512;
+
+            // Limpiar canvas
+            ctx.clearRect(0, 0, size, size);
+
+            // Fondo circular verde
+            ctx.fillStyle = '#2d5016';
+            ctx.beginPath();
+            ctx.arc(center, center, center, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Tronco del árbol
+            const trunkWidth = 40 * scale;
+            const trunkHeight = 120 * scale;
+            const trunkX = center - trunkWidth / 2;
+            const trunkY = size - trunkHeight - (20 * scale);
+            
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(trunkX, trunkY, trunkWidth, trunkHeight);
+
+            // Copa del árbol - círculos superpuestos
+            const mainRadius = 80 * scale;
+            const sideRadius = 60 * scale;
+            const topRadius = 65 * scale;
+            
+            // Copa principal
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.arc(center, center - (30 * scale), mainRadius, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Copas laterales
+            ctx.fillStyle = '#66BB6A';
+            ctx.beginPath();
+            ctx.arc(center - (36 * scale), center - (50 * scale), sideRadius, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(center + (36 * scale), center - (50 * scale), sideRadius, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Copa superior
+            ctx.fillStyle = '#81C784';
+            ctx.beginPath();
+            ctx.arc(center, center - (70 * scale), topRadius, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Hojas adicionales
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.arc(center - (56 * scale), center - (20 * scale), 35 * scale, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(center + (56 * scale), center - (20 * scale), 35 * scale, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Copa muy superior
+            ctx.fillStyle = '#81C784';
+            ctx.beginPath();
+            ctx.arc(center, center - (110 * scale), 40 * scale, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Brillo en la copa
+            ctx.fillStyle = 'rgba(165, 214, 167, 0.6)';
+            ctx.beginPath();
+            ctx.arc(center - (26 * scale), center - (90 * scale), 20 * scale, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+
+        function generateFavicons() {
+            const canvasesDiv = document.getElementById('canvases');
+            const downloadDiv = document.getElementById('download-links');
+            
+            sizes.forEach(({ size, name }) => {
+                // Crear canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                canvas.style.width = Math.min(size, 100) + 'px';
+                canvas.style.height = Math.min(size, 100) + 'px';
+                
+                const ctx = canvas.getContext('2d');
+                drawTreeIcon(ctx, size);
+                
+                // Agregar al DOM
+                const label = document.createElement('div');
+                label.className = 'size-label';
+                label.textContent = `${size}x${size} - ${name}`;
+                
+                canvasesDiv.appendChild(label);
+                canvasesDiv.appendChild(canvas);
+                
+                // Crear enlace de descarga
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = name;
+                link.textContent = `Descargar ${name}`;
+                link.style.display = 'block';
+                link.style.margin = '5px 0';
+                link.style.color = '#2d5016';
+                downloadDiv.appendChild(link);
+            });
+        }
+
+        function downloadAll() {
+            const links = document.querySelectorAll('#download-links a');
+            links.forEach((link, index) => {
+                setTimeout(() => {
+                    link.click();
+                }, index * 200);
+            });
+        }
+
+        // Generar favicons al cargar la página
+        window.onload = generateFavicons;
+    </script>
+</body>
+</html>
