@@ -143,7 +143,7 @@ const RegisterScreen = ({ navigation }) => {
           styles.roleButtonText,
           formData.role === 'scientist' && styles.roleButtonTextSelected
         ]}>
-          🔬 Científico - Validar datos
+          🧪 Científico - Validar datos
         </Text>
         <Text style={styles.roleNote}>
           * Requiere aprobación del administrador

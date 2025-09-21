@@ -4,7 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 const ScientistScreen = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🔬 Panel del Científico</Text>
+      <Text style={styles.title}>🧪 Panel del Científico</Text>
       <Text style={styles.subtitle}>
         Aquí podrás revisar y aprobar los árboles pendientes de validación
       </Text>

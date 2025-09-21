@@ -233,7 +233,7 @@ const HomeScreen = ({ navigation }) => {
           {user?.role && (
             <Text style={styles.roleText}>
               {user.role === 'explorer' ? '🌱 Explorador' : 
-               user.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
+               user.role === 'scientist' ? '🧪 Científico' : '⚙️ Administrador'}
             </Text>
           )}
         </View>

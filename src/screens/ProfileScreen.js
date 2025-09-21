@@ -51,7 +51,7 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.email}>{user?.email}</Text>
         <Text style={styles.role}>
           {profile?.role === 'explorer' ? '🔍 Explorador' : 
-           profile?.role === 'scientist' ? '🔬 Científico' : '⚙️ Administrador'}
+           profile?.role === 'scientist' ? '🧪 Científico' : '⚙️ Administrador'}
         </Text>
       </View>
 

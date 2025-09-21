@@ -32,7 +32,7 @@ const ScientistApprovalScreen = ({ navigation }) => {
   const loadTrees = async () => {
     try {
       setLoading(true);
-      console.log('🔬 [ScientistApproval] Cargando registros para revisión...');
+      console.log('🧪 [ScientistApproval] Cargando registros para revisión...');
       
       // Cargar árboles y animales en paralelo
       const treeService = new SimpleTreeService();
@@ -446,7 +446,7 @@ const ScientistApprovalScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <CustomHeader title="🔬 Revisión Científica" showBackButton={false} />
+      <CustomHeader title="🧪 Revisión Científica" showBackButton={false} />
 
       <View style={styles.filtersContainer}>
         <FilterButton filterKey="pending" title="Pendientes" count={pendingCount} iconName="time-outline" iconColor="#ffc107" />

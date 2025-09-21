@@ -28,7 +28,7 @@ const UserEditModal = ({
 
   const roles = [
     { value: 'explorer', label: '🔍 Explorador', description: 'Puede registrar plantas y animales' },
-    { value: 'scientist', label: '🔬 Científico', description: 'Puede aprobar/rechazar registros' },
+    { value: 'scientist', label: '🧪 Científico', description: 'Puede aprobar/rechazar registros' },
     { value: 'admin', label: '⚙️ Administrador', description: 'Acceso completo al sistema' }
   ];
 

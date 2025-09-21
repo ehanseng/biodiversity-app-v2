@@ -413,7 +413,7 @@ const AdminScreen = () => {
               ]}
               onPress={() => handleFilterClick('scientist')}
             >
-              <Text style={styles.statIcon}>🔬</Text>
+              <Text style={styles.statIcon}>🧪</Text>
               <Text style={styles.statNumber}>{stats.scientists}</Text>
               <Text style={styles.statLabel}>Científicos</Text>
             </TouchableOpacity>
