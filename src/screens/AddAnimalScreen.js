@@ -365,7 +365,14 @@ const AddAnimalScreen = ({ navigation }) => {
     >
       <ScrollView ref={scrollViewRef} style={styles.container} contentContainerStyle={styles.contentContainer}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
           <Text style={styles.title}>Registrar Animal</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.form}>
           {/* Campos del formulario */}
@@ -485,12 +492,24 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 10,
+  },
+  headerSpacer: {
+    width: 40, // Mismo ancho que el botón para centrar el título
   },
   form: {
     padding: 20,
