@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import SimpleUserService from '../services/SimpleUserService';
+import SafeStorage from '../utils/SafeStorage';
 
 const AuthContext = createContext({});
 
@@ -22,15 +23,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkStoredUser = () => {
       try {
-        const storedUser = localStorage.getItem('biodiversity_user');
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
+        const userData = SafeStorage.getJSON('biodiversity_user');
+        if (userData) {
           setUser(userData);
-          console.log('✅ [SimpleAuth] Usuario cargado desde localStorage:', userData.email);
+          console.log('✅ [SimpleAuth] Usuario cargado desde SafeStorage:', userData.email);
         }
       } catch (error) {
         console.error('❌ [SimpleAuth] Error cargando usuario:', error);
-        localStorage.removeItem('biodiversity_user');
+        SafeStorage.removeItem('biodiversity_user');
       } finally {
         setLoading(false);
       }
@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
       const userData = await userService.loginUser(email, password);
       
       setUser(userData);
-      localStorage.setItem('biodiversity_user', JSON.stringify(userData));
+      SafeStorage.setJSON('biodiversity_user', userData);
       
       console.log('✅ [SimpleAuth] Login exitoso:', userData.email);
       return { success: true, user: userData };
@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       setUser(userData);
-      localStorage.setItem('biodiversity_user', JSON.stringify(userData));
+      SafeStorage.setJSON('biodiversity_user', userData);
       
       console.log('✅ [SimpleAuth] Registro exitoso:', userData.email);
       return { success: true, user: userData };
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       console.log('🚪 [SimpleAuth] Cerrando sesión');
       setUser(null);
       setError(null);
-      localStorage.removeItem('biodiversity_user');
+      SafeStorage.removeItem('biodiversity_user');
       console.log('✅ [SimpleAuth] Sesión cerrada');
       return { success: true };
     } catch (error) {

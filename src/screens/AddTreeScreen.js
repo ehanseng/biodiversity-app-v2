@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import MobileImagePicker from '../components/MobileImagePicker';
 // Supabase removido - usando sistema simple
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
@@ -190,6 +191,25 @@ const AddTreeScreen = ({ navigation }) => {
   };
 
   const takePhoto = async () => {
+    // Solo usar MobileImagePicker en móvil web, en desktop usar lógica original
+    if (Platform.OS === 'web' && MobileImagePicker.isMobileWeb()) {
+      try {
+        const result = await MobileImagePicker.takePhoto();
+        
+        if (result) {
+          const imageUri = result.uri;
+          console.log('📸 [takePhoto] Imagen capturada (móvil web):', imageUri.substring(0, 50) + '...');
+          setImage(imageUri);
+          showNotification('Foto capturada', 'La foto se ha capturado correctamente', 'success');
+        }
+      } catch (error) {
+        console.error('❌ [takePhoto] Error:', error);
+        showNotification('Error', 'No se pudo capturar la foto', 'error');
+      }
+      return;
+    }
+
+    // Lógica original para desktop y app nativa
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permiso denegado', 'Necesitamos acceso a tu cámara para tomar una foto.');
@@ -200,13 +220,12 @@ const AddTreeScreen = ({ navigation }) => {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
-      base64: Platform.OS === 'web', // Obtener base64 en web para poder mostrar la imagen
+      base64: Platform.OS === 'web',
     });
 
     if (!result.canceled) {
       const imageUri = result.assets[0].uri;
       
-      // En web, crear una URL que funcione para mostrar la imagen
       if (Platform.OS === 'web' && result.assets[0].base64) {
         const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
         console.log('📸 [takePhoto] Imagen base64 generada para web:', base64Image.substring(0, 50) + '...');
@@ -219,6 +238,25 @@ const AddTreeScreen = ({ navigation }) => {
   };
 
   const pickFromGallery = async () => {
+    // Solo usar MobileImagePicker en móvil web, en desktop usar lógica original
+    if (Platform.OS === 'web' && MobileImagePicker.isMobileWeb()) {
+      try {
+        const result = await MobileImagePicker.pickFromGallery();
+        
+        if (result) {
+          const imageUri = result.uri;
+          console.log('🖼️ [pickFromGallery] Imagen seleccionada (móvil web):', imageUri.substring(0, 50) + '...');
+          setImage(imageUri);
+          showNotification('Imagen seleccionada', 'La imagen se ha seleccionado correctamente', 'success');
+        }
+      } catch (error) {
+        console.error('❌ [pickFromGallery] Error:', error);
+        showNotification('Error', 'No se pudo seleccionar la imagen', 'error');
+      }
+      return;
+    }
+
+    // Lógica original para desktop y app nativa
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permiso denegado', 'Necesitamos acceso a tu galería para seleccionar una foto.');
@@ -230,19 +268,18 @@ const AddTreeScreen = ({ navigation }) => {
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.7,
-      base64: Platform.OS === 'web', // Obtener base64 en web para poder mostrar la imagen
+      base64: Platform.OS === 'web',
     });
 
     if (!result.canceled) {
       const imageUri = result.assets[0].uri;
       
-      // En web, crear una URL que funcione para mostrar la imagen
       if (Platform.OS === 'web' && result.assets[0].base64) {
         const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-        console.log('📸 [pickFromGallery] Imagen base64 generada para web:', base64Image.substring(0, 50) + '...');
+        console.log('🖼️ [pickFromGallery] Imagen base64 generada para web:', base64Image.substring(0, 50) + '...');
         setImage(base64Image);
       } else {
-        console.log('📸 [pickFromGallery] Usando URI nativa:', imageUri);
+        console.log('🖼️ [pickFromGallery] Usando URI nativa:', imageUri);
         setImage(imageUri);
       }
     }

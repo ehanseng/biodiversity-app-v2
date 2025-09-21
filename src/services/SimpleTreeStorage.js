@@ -1,27 +1,28 @@
-// Servicio simple de storage específico por usuario
+import SafeStorage from '../utils/SafeStorage';
+
+// Servicio de almacenamiento local específico por usuario
 class SimpleTreeStorage {
   
   // Obtener clave de storage específica por usuario
   static getUserStorageKey() {
     try {
-      const authData = localStorage.getItem('biodiversity_user');
+      const authData = SafeStorage.getItem('biodiversity_user');
       if (authData) {
         const auth = JSON.parse(authData);
         const userId = auth.id || auth.email || 'default';
-        return `@biodiversity_trees_${userId}`;
+        return `biodiversity_trees_${userId}`;
       }
     } catch (error) {
-      console.error('Error obteniendo usuario:', error);
+      console.error('❌ Error obteniendo clave de usuario:', error);
     }
-    return '@biodiversity_trees_default';
+    return 'biodiversity_trees_default';
   }
   
   // Obtener árboles locales del usuario actual
   static getLocalTrees() {
     try {
       const storageKey = this.getUserStorageKey();
-      const treesJson = localStorage.getItem(storageKey);
-      const trees = treesJson ? JSON.parse(treesJson) : [];
+      const trees = SafeStorage.getJSON(storageKey, []);
       console.log(`📋 [SimpleTreeStorage] Árboles recuperados: ${trees.length}`);
       return trees;
     } catch (error) {
@@ -34,7 +35,7 @@ class SimpleTreeStorage {
   static saveLocalTrees(trees) {
     try {
       const storageKey = this.getUserStorageKey();
-      localStorage.setItem(storageKey, JSON.stringify(trees));
+      SafeStorage.setJSON(storageKey, trees);
       console.log(`✅ [SimpleTreeStorage] ${trees.length} árboles guardados`);
     } catch (error) {
       console.error('❌ Error guardando árboles:', error);
@@ -45,7 +46,7 @@ class SimpleTreeStorage {
   static clearUserData() {
     try {
       const storageKey = this.getUserStorageKey();
-      localStorage.removeItem(storageKey);
+      SafeStorage.removeItem(storageKey);
       console.log('🧹 [SimpleTreeStorage] Datos del usuario limpiados');
     } catch (error) {
       console.error('❌ Error limpiando datos:', error);
