@@ -36,8 +36,16 @@ $method = $_SERVER['REQUEST_METHOD'];
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $pathParts = explode('/', trim($path, '/'));
 
+// DEBUG: Log de información de la petición
+error_log("=== DEBUG ADMIN ENDPOINT ===");
+error_log("Method: " . $method);
+error_log("Path: " . $path);
+error_log("Path Parts: " . json_encode($pathParts));
+error_log("Request URI: " . $_SERVER['REQUEST_URI']);
+
 // Obtener el último segmento de la URL para determinar la acción
 $action = end($pathParts);
+error_log("Action: " . $action);
 
 // Obtener datos JSON del cuerpo de la petición
 $input = json_decode(file_get_contents('php://input'), true);
@@ -45,18 +53,20 @@ $input = json_decode(file_get_contents('php://input'), true);
 try {
     switch ($method) {
         case 'GET':
-            if ($action === 'users' || $action === 'admin') {
+            // Detectar diferentes tipos de peticiones GET
+            if ($action === 'users' || $action === 'admin' || in_array('users', $pathParts) || in_array('admin', $pathParts)) {
                 // GET /admin/users - Obtener todos los usuarios
                 getAllUsers($pdo);
-            } elseif ($action === 'search') {
+            } elseif ($action === 'search' || isset($_GET['q'])) {
                 // GET /admin/users/search?q=query - Buscar usuarios
                 searchUsers($pdo);
-            } elseif ($action === 'stats') {
+            } elseif ($action === 'stats' || in_array('stats', $pathParts)) {
                 // GET /admin/stats/users - Estadísticas de usuarios
                 getUserStats($pdo);
             } else {
-                http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Endpoint no encontrado']);
+                // Si no coincide ninguna ruta, intentar obtener todos los usuarios por defecto
+                error_log("No se encontró ruta específica, intentando getAllUsers por defecto");
+                getAllUsers($pdo);
             }
             break;
 

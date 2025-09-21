@@ -27,6 +27,7 @@ const AdminScreen = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [stats, setStats] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [activeFilter, setActiveFilter] = useState(null);
 
   const userService = new UserManagementService();
 
@@ -37,7 +38,7 @@ const AdminScreen = () => {
 
   useEffect(() => {
     filterUsers();
-  }, [searchQuery, users]);
+  }, [searchQuery, users, activeFilter]);
 
   const loadUsers = async () => {
     try {
@@ -47,7 +48,7 @@ const AdminScreen = () => {
       console.log('✅ [AdminScreen] Usuarios cargados:', usersData.length);
     } catch (error) {
       console.error('❌ [AdminScreen] Error cargando usuarios:', error);
-      Alert.alert('Error', 'No se pudieron cargar los usuarios: ' + error.message);
+      window.alert('No se pudieron cargar los usuarios: ' + error.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -64,21 +65,59 @@ const AdminScreen = () => {
   };
 
   const filterUsers = () => {
-    if (!searchQuery.trim()) {
-      setFilteredUsers(users);
-    } else {
-      const filtered = users.filter(user =>
+    let filtered = users;
+
+    // Aplicar filtro de búsqueda por texto
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(user =>
         user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.full_name.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredUsers(filtered);
     }
+
+    // Aplicar filtro de tarjeta activa
+    if (activeFilter) {
+      switch (activeFilter) {
+        case 'active':
+          filtered = filtered.filter(user => user.is_active === true);
+          break;
+        case 'inactive':
+          filtered = filtered.filter(user => user.is_active === false);
+          break;
+        case 'explorer':
+          filtered = filtered.filter(user => user.role === 'explorer');
+          break;
+        case 'scientist':
+          filtered = filtered.filter(user => user.role === 'scientist');
+          break;
+        case 'admin':
+          filtered = filtered.filter(user => user.role === 'admin');
+          break;
+        default:
+          break;
+      }
+    }
+
+    setFilteredUsers(filtered);
   };
 
   const onRefresh = () => {
     setRefreshing(true);
     loadUsers();
     loadStats();
+  };
+
+  const handleFilterClick = (filterType) => {
+    console.log('🔍 [AdminScreen] Filtro seleccionado:', filterType);
+    
+    // Si ya está activo el mismo filtro, lo desactivamos
+    if (activeFilter === filterType) {
+      setActiveFilter(null);
+      console.log('🔍 [AdminScreen] Filtro desactivado');
+    } else {
+      setActiveFilter(filterType);
+      console.log('🔍 [AdminScreen] Filtro activado:', filterType);
+    }
   };
 
   const handleEditUser = (user) => {
@@ -102,86 +141,85 @@ const AdminScreen = () => {
 
       setEditModalVisible(false);
       setSelectedUser(null);
-      Alert.alert('Éxito', 'Usuario actualizado correctamente');
+      window.alert('Usuario actualizado correctamente');
     } catch (error) {
       console.error('❌ [AdminScreen] Error actualizando usuario:', error);
-      Alert.alert('Error', 'No se pudo actualizar el usuario: ' + error.message);
+      window.alert('No se pudo actualizar el usuario: ' + error.message);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleToggleUserStatus = async (user) => {
+    console.log('🔄 [AdminScreen] Intentando cambiar estado de:', user.full_name, 'Estado actual:', user.is_active);
+    
     const newStatus = !user.is_active;
     const action = newStatus ? 'activar' : 'desactivar';
     
-    Alert.alert(
-      'Confirmar Acción',
-      `¿Estás seguro de que quieres ${action} a ${user.full_name}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Confirmar',
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              await userService.toggleUserStatus(user.id, newStatus);
-              
-              // Actualizar lista local
-              setUsers(prevUsers =>
-                prevUsers.map(u =>
-                  u.id === user.id
-                    ? { ...u, is_active: newStatus }
-                    : u
-                )
-              );
+    console.log('🔄 [AdminScreen] Nuevo estado será:', newStatus, 'Acción:', action);
+    
+    // Usar window.confirm para web en lugar de Alert.alert
+    const confirmed = window.confirm(`¿Estás seguro de que quieres ${action} a ${user.full_name}?`);
+    
+    if (!confirmed) {
+      console.log('❌ [AdminScreen] Usuario canceló la acción');
+      return;
+    }
 
-              Alert.alert('Éxito', `Usuario ${action} correctamente`);
-            } catch (error) {
-              console.error('❌ [AdminScreen] Error cambiando estado:', error);
-              Alert.alert('Error', `No se pudo ${action} el usuario: ` + error.message);
-            } finally {
-              setActionLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    try {
+      console.log('✅ [AdminScreen] Usuario confirmó la acción');
+      setActionLoading(true);
+      
+      const result = await userService.toggleUserStatus(user.id, newStatus);
+      console.log('✅ [AdminScreen] Respuesta del servicio:', result);
+      
+      // Actualizar lista local
+      setUsers(prevUsers =>
+        prevUsers.map(u =>
+          u.id === user.id
+            ? { ...u, is_active: newStatus }
+            : u
+        )
+      );
+
+      console.log('✅ [AdminScreen] Lista local actualizada');
+      
+      // Usar window.alert para el mensaje de éxito
+      window.alert(`Usuario ${action} correctamente`);
+    } catch (error) {
+      console.error('❌ [AdminScreen] Error cambiando estado:', error);
+      window.alert(`No se pudo ${action} el usuario: ${error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleDeleteUser = async (user) => {
     if (user.email === currentUser?.email) {
-      Alert.alert('Error', 'No puedes eliminar tu propia cuenta');
+      window.alert('Error: No puedes eliminar tu propia cuenta');
       return;
     }
 
-    Alert.alert(
-      'Confirmar Eliminación',
-      `¿Estás seguro de que quieres eliminar a ${user.full_name}?\n\nEsta acción no se puede deshacer.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              await userService.deleteUser(user.id);
-              
-              // Remover de lista local
-              setUsers(prevUsers => prevUsers.filter(u => u.id !== user.id));
-              
-              Alert.alert('Éxito', 'Usuario eliminado correctamente');
-            } catch (error) {
-              console.error('❌ [AdminScreen] Error eliminando usuario:', error);
-              Alert.alert('Error', 'No se pudo eliminar el usuario: ' + error.message);
-            } finally {
-              setActionLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    const confirmed = window.confirm(`¿Estás seguro de que quieres eliminar a ${user.full_name}?\n\nEsta acción no se puede deshacer.`);
+    
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      await userService.deleteUser(user.id);
+      
+      // Remover de lista local
+      setUsers(prevUsers => prevUsers.filter(u => u.id !== user.id));
+      
+      window.alert('Usuario eliminado correctamente');
+    } catch (error) {
+      console.error('❌ [AdminScreen] Error eliminando usuario:', error);
+      window.alert('No se pudo eliminar el usuario: ' + error.message);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const getRoleColor = (role) => {
@@ -197,12 +235,40 @@ const AdminScreen = () => {
     switch (role) {
       case 'admin': return 'build';
       case 'scientist': return 'flask';
-      case 'explorer': return 'leaf';
+      case 'explorer': return 'search';
       default: return 'person';
     }
   };
 
-  const renderUserItem = ({ item: user }) => (
+  const getRoleLabel = (role) => {
+    switch (role) {
+      case 'admin': return 'Admin';
+      case 'scientist': return 'Científico';
+      case 'explorer': return 'Explorador';
+      default: return 'Usuario';
+    }
+  };
+
+  const getFilterLabel = (filter) => {
+    switch (filter) {
+      case 'active': return 'usuarios activos';
+      case 'inactive': return 'usuarios desactivados';
+      case 'explorer': return 'exploradores';
+      case 'scientist': return 'científicos';
+      case 'admin': return 'administradores';
+      default: return 'usuarios';
+    }
+  };
+
+  const renderUserItem = ({ item: user }) => {
+    // Debug: verificar qué botones se muestran
+    const canEdit = (user.role !== 'admin' || user.email === currentUser?.email);
+    const canToggleStatus = (user.role !== 'admin' || user.email === currentUser?.email);
+    const canDelete = user.role !== 'admin' && user.email !== currentUser?.email;
+    
+    console.log(`🔍 [AdminScreen] Usuario: ${user.full_name} | Puede editar: ${canEdit} | Puede cambiar estado: ${canToggleStatus} | Puede eliminar: ${canDelete}`);
+    
+    return (
     <View style={styles.userCard}>
       <View style={styles.userHeader}>
         <View style={styles.userInfo}>
@@ -211,11 +277,17 @@ const AdminScreen = () => {
           <View style={styles.userMeta}>
             <View style={[styles.roleBadge, { backgroundColor: getRoleColor(user.role) }]}>
               <Ionicons name={getRoleIcon(user.role)} size={12} color="#fff" />
-              <Text style={styles.roleText}>{user.role}</Text>
+              <Text style={styles.roleText}>{getRoleLabel(user.role)}</Text>
             </View>
-            <Text style={[styles.statusText, { color: user.is_active ? '#28a745' : '#dc3545' }]}>
+            <Text style={[
+              styles.statusText,
+              { color: user.is_active ? '#28a745' : '#dc3545' }
+            ]}>
               {user.is_active ? '✅ Activo' : '❌ Inactivo'}
             </Text>
+            {user.role === 'scientist' && user.approved === false && (
+              <Text style={styles.pendingText}>⏳ Pendiente</Text>
+            )}
           </View>
         </View>
         <View style={styles.userStats}>
@@ -225,31 +297,38 @@ const AdminScreen = () => {
       </View>
 
       <View style={styles.userActions}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() => handleEditUser(user)}
-          disabled={actionLoading}
-        >
-          <Ionicons name="create-outline" size={16} color="#007bff" />
-          <Text style={[styles.actionButtonText, { color: '#007bff' }]}>Editar</Text>
-        </TouchableOpacity>
+        {/* Solo permitir editar si no es admin o es la propia cuenta */}
+        {(user.role !== 'admin' || user.email === currentUser?.email) && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editButton]}
+            onPress={() => handleEditUser(user)}
+            disabled={actionLoading}
+          >
+            <Ionicons name="create-outline" size={16} color="#007bff" />
+            <Text style={[styles.actionButtonText, { color: '#007bff' }]}>Editar</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={[styles.actionButton, user.is_active ? styles.deactivateButton : styles.activateButton]}
-          onPress={() => handleToggleUserStatus(user)}
-          disabled={actionLoading}
-        >
-          <Ionicons 
-            name={user.is_active ? 'pause-outline' : 'play-outline'} 
-            size={16} 
-            color={user.is_active ? '#ffc107' : '#28a745'} 
-          />
-          <Text style={[styles.actionButtonText, { color: user.is_active ? '#ffc107' : '#28a745' }]}>
-            {user.is_active ? 'Desactivar' : 'Activar'}
-          </Text>
-        </TouchableOpacity>
+        {/* Solo permitir activar/desactivar si no es admin o es la propia cuenta */}
+        {(user.role !== 'admin' || user.email === currentUser?.email) && (
+          <TouchableOpacity
+            style={[styles.actionButton, user.is_active ? styles.deactivateButton : styles.activateButton]}
+            onPress={() => handleToggleUserStatus(user)}
+            disabled={actionLoading}
+          >
+            <Ionicons 
+              name={user.is_active ? 'pause-outline' : 'play-outline'} 
+              size={16} 
+              color={user.is_active ? '#ffc107' : '#28a745'} 
+            />
+            <Text style={[styles.actionButtonText, { color: user.is_active ? '#ffc107' : '#28a745' }]}>
+              {user.is_active ? 'Desactivar' : 'Activar'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
-        {user.email !== currentUser?.email && (
+        {/* Solo permitir eliminar si no es admin y no es la propia cuenta */}
+        {user.role !== 'admin' && user.email !== currentUser?.email && (
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
             onPress={() => handleDeleteUser(user)}
@@ -259,9 +338,18 @@ const AdminScreen = () => {
             <Text style={[styles.actionButtonText, { color: '#dc3545' }]}>Eliminar</Text>
           </TouchableOpacity>
         )}
+
+        {/* Mostrar mensaje de protección para admins */}
+        {user.role === 'admin' && user.email !== currentUser?.email && (
+          <View style={styles.protectedBadge}>
+            <Ionicons name="shield-checkmark" size={16} color="#28a745" />
+            <Text style={styles.protectedText}>Protegido</Text>
+          </View>
+        )}
       </View>
     </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -278,30 +366,68 @@ const AdminScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>⚙️ Panel de Administración</Text>
         <Text style={styles.subtitle}>Gestión de usuarios del sistema</Text>
+        {stats && (
+          <Text style={styles.totalUsers}>👥 {stats.total_users} usuarios registrados</Text>
+        )}
         
         {/* Estadísticas dentro del header */}
         {stats && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.total_users}</Text>
-              <Text style={styles.statLabel}>👥 Total Usuarios</Text>
-            </View>
-            <View style={styles.statCard}>
+            <TouchableOpacity 
+              style={[
+                styles.statCard, 
+                activeFilter === 'active' && styles.statCardActive
+              ]}
+              onPress={() => handleFilterClick('active')}
+            >
+              <Text style={styles.statIcon}>✅</Text>
               <Text style={styles.statNumber}>{stats.active_users}</Text>
-              <Text style={styles.statLabel}>✅ Activos</Text>
-            </View>
-            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Activos</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                styles.statCard, 
+                activeFilter === 'inactive' && styles.statCardActive
+              ]}
+              onPress={() => handleFilterClick('inactive')}
+            >
+              <Text style={styles.statIcon}>❌</Text>
+              <Text style={styles.statNumber}>{stats.inactive_users}</Text>
+              <Text style={styles.statLabel}>Desactivados</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                styles.statCard, 
+                activeFilter === 'explorer' && styles.statCardActive
+              ]}
+              onPress={() => handleFilterClick('explorer')}
+            >
+              <Text style={styles.statIcon}>🔍</Text>
               <Text style={styles.statNumber}>{stats.explorers}</Text>
-              <Text style={styles.statLabel}>🌱 Exploradores</Text>
-            </View>
-            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Exploradores</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                styles.statCard, 
+                activeFilter === 'scientist' && styles.statCardActive
+              ]}
+              onPress={() => handleFilterClick('scientist')}
+            >
+              <Text style={styles.statIcon}>🔬</Text>
               <Text style={styles.statNumber}>{stats.scientists}</Text>
-              <Text style={styles.statLabel}>🔬 Científicos</Text>
-            </View>
-            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Científicos</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                styles.statCard, 
+                activeFilter === 'admin' && styles.statCardActive
+              ]}
+              onPress={() => handleFilterClick('admin')}
+            >
+              <Text style={styles.statIcon}>⚙️</Text>
               <Text style={styles.statNumber}>{stats.admins}</Text>
-              <Text style={styles.statLabel}>⚙️ Admins</Text>
-            </View>
+              <Text style={styles.statLabel}>Admins</Text>
+            </TouchableOpacity>
           </ScrollView>
         )}
       </View>
@@ -311,13 +437,25 @@ const AdminScreen = () => {
         <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar usuarios por email o nombre..."
+          placeholder={
+            activeFilter 
+              ? `Buscar en ${getFilterLabel(activeFilter)}...`
+              : "Buscar usuarios por email o nombre..."
+          }
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
             <Ionicons name="close-circle" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
+        {activeFilter && (
+          <TouchableOpacity 
+            onPress={() => setActiveFilter(null)}
+            style={styles.filterClearButton}
+          >
+            <Text style={styles.filterClearText}>✕</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -401,6 +539,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     opacity: 0.9,
   },
+  totalUsers: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+    marginTop: 8,
+    fontWeight: '500',
+  },
   statsContainer: {
     paddingVertical: 15,
     paddingHorizontal: 0,
@@ -409,11 +554,11 @@ const styles = StyleSheet.create({
   statCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 10,
-    marginHorizontal: 5,
+    padding: 6,
+    marginHorizontal: 3,
     alignItems: 'center',
-    minWidth: 80,
-    height: 70,
+    minWidth: 70,
+    height: 80,
     justifyContent: 'center',
     elevation: 2,
     shadowColor: '#000',
@@ -421,17 +566,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
+  statCardActive: {
+    backgroundColor: '#e8f5e8',
+    borderWidth: 2,
+    borderColor: '#2d5016',
+    elevation: 4,
+    shadowOpacity: 0.3,
+  },
+  statIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
   statNumber: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#2d5016',
     marginBottom: 2,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 12,
+    lineHeight: 10,
+    fontWeight: '500',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -455,6 +612,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
+  },
+  filterClearButton: {
+    backgroundColor: '#2d5016',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  filterClearText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   usersList: {
     flex: 1,
@@ -514,6 +685,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  pendingText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#ffc107',
+    marginLeft: 8,
+  },
   userStats: {
     alignItems: 'flex-end',
   },
@@ -554,7 +731,22 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     borderColor: '#dc3545',
-    backgroundColor: '#fff0f0',
+  },
+  protectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#28a745',
+  },
+  protectedText: {
+    fontSize: 12,
+    color: '#28a745',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,

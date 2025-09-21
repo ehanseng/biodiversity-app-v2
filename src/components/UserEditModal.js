@@ -22,11 +22,12 @@ const UserEditModal = ({
   const [editedUser, setEditedUser] = useState({
     email: '',
     full_name: '',
-    role: 'explorer'
+    role: 'explorer',
+    password: ''
   });
 
   const roles = [
-    { value: 'explorer', label: '🌱 Explorador', description: 'Puede registrar plantas y animales' },
+    { value: 'explorer', label: '🔍 Explorador', description: 'Puede registrar plantas y animales' },
     { value: 'scientist', label: '🔬 Científico', description: 'Puede aprobar/rechazar registros' },
     { value: 'admin', label: '⚙️ Administrador', description: 'Acceso completo al sistema' }
   ];
@@ -36,7 +37,8 @@ const UserEditModal = ({
       setEditedUser({
         email: user.email || '',
         full_name: user.full_name || '',
-        role: user.role || 'explorer'
+        role: user.role || 'explorer',
+        password: '' // Siempre vacío por seguridad
       });
     }
   }, [user]);
@@ -52,14 +54,19 @@ const UserEditModal = ({
       return;
     }
 
-    // Validar email básico
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(editedUser.email)) {
-      Alert.alert('Error', 'Por favor ingresa un email válido');
-      return;
+    // Preparar datos para enviar
+    const dataToSave = {
+      email: editedUser.email.trim(),
+      full_name: editedUser.full_name.trim(),
+      role: editedUser.role
+    };
+
+    // Solo incluir contraseña si se proporcionó
+    if (editedUser.password.trim()) {
+      dataToSave.password = editedUser.password.trim();
     }
 
-    onSave(editedUser);
+    onSave(dataToSave);
   };
 
   const getRoleColor = (role) => {
@@ -117,6 +124,22 @@ const UserEditModal = ({
                 value={editedUser.full_name}
                 onChangeText={(text) => setEditedUser(prev => ({ ...prev, full_name: text }))}
                 placeholder="Nombre completo del usuario"
+                editable={!loading}
+              />
+            </View>
+
+            {/* Contraseña */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>🔐 Nueva Contraseña</Text>
+              <Text style={styles.passwordNote}>
+                Dejar vacío para mantener la contraseña actual
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={editedUser.password}
+                onChangeText={(text) => setEditedUser(prev => ({ ...prev, password: text }))}
+                placeholder="Nueva contraseña (opcional)"
+                secureTextEntry
                 editable={!loading}
               />
             </View>
@@ -301,6 +324,12 @@ const styles = StyleSheet.create({
   },
   roleDescriptionSelected: {
     color: '#2d5016',
+  },
+  passwordNote: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginBottom: 8,
   },
   infoSection: {
     backgroundColor: '#f8f9fa',

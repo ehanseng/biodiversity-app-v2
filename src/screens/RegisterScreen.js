@@ -145,20 +145,8 @@ const RegisterScreen = ({ navigation }) => {
         ]}>
           🔬 Científico - Validar datos
         </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.roleButton,
-          formData.role === 'admin' && styles.roleButtonSelected
-        ]}
-        onPress={() => updateFormData('role', 'admin')}
-      >
-        <Text style={[
-          styles.roleButtonText,
-          formData.role === 'admin' && styles.roleButtonTextSelected
-        ]}>
-          ⚙️ Administrador - Gestión completa
+        <Text style={styles.roleNote}>
+          * Requiere aprobación del administrador
         </Text>
       </TouchableOpacity>
     </View>
@@ -307,6 +295,13 @@ const styles = StyleSheet.create({
   roleButtonTextSelected: {
     color: '#2d5016',
     fontWeight: '600',
+  },
+  roleNote: {
+    fontSize: 11,
+    color: '#ffc107',
+    textAlign: 'center',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   button: {
     backgroundColor: '#2d5016',

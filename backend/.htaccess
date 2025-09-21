@@ -1,0 +1,13 @@
+RewriteEngine On
+
+# Redirigir /api/admin/users a admin-users-endpoint.php
+RewriteRule ^admin/users/?$ admin-users-endpoint.php [L,QSA]
+RewriteRule ^admin/users/(.*)$ admin-users-endpoint.php [L,QSA]
+
+# Redirigir /api/admin/stats/users a admin-users-endpoint.php
+RewriteRule ^admin/stats/users/?$ admin-users-endpoint.php [L,QSA]
+
+# Permitir CORS
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization"

@@ -347,6 +347,9 @@ const AddTreeScreen = ({ navigation }) => {
     
     try {
       // Preparar datos del árbol
+      console.log('👤 [AddTreeScreen] Usuario actual:', user);
+      console.log('🆔 [AddTreeScreen] user_id que se usará:', user?.id || 1);
+      
       const treeData = {
         user_id: user?.id || 1, // ID del usuario logueado
         common_name: formData.common_name.trim(),

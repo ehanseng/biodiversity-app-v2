@@ -9,14 +9,31 @@ class UserManagementService {
     // Fallback para desarrollo local
     this.fallbackUrl = 'http://localhost/biodiversity-app/backend';
     // Modo de desarrollo - usar datos mock temporalmente
-    this.useMockData = true;
+    this.useMockData = false; // CAMBIAR A DATOS REALES - Conectar con BD remota
+    this.mockDataKey = 'admin_mock_users';
   }
 
   /**
-   * Datos mock para desarrollo
+   * Datos mock para desarrollo con persistencia en localStorage
    */
   getMockUsers() {
-    return [
+    // TEMPORAL: Limpiar localStorage para forzar recarga de datos
+    localStorage.removeItem(this.mockDataKey); // Forzar recarga de datos con nuevo admin
+    
+    // Intentar cargar desde localStorage primero
+    try {
+      const savedUsers = localStorage.getItem(this.mockDataKey);
+      if (savedUsers) {
+        console.log('📦 [UserManagement] Cargando usuarios desde localStorage');
+        return JSON.parse(savedUsers);
+      }
+    } catch (error) {
+      console.warn('⚠️ [UserManagement] Error cargando desde localStorage:', error);
+    }
+
+    // Si no hay datos guardados, usar datos por defecto
+    console.log('🔧 [UserManagement] Usando datos mock por defecto');
+    const defaultUsers = [
       {
         id: 1,
         email: 'admin@vibo.co',
@@ -25,8 +42,8 @@ class UserManagementService {
         is_active: true,
         created_at: '2024-01-15T10:30:00Z',
         updated_at: '2024-01-15T10:30:00Z',
-        trees_count: 25,
-        animals_count: 12
+        trees_count: 8,
+        animals_count: 2
       },
       {
         id: 2,
@@ -34,10 +51,11 @@ class UserManagementService {
         full_name: 'Científico VIBO',
         role: 'scientist',
         is_active: true,
+        approved: true,
         created_at: '2024-01-20T14:15:00Z',
         updated_at: '2024-01-20T14:15:00Z',
-        trees_count: 18,
-        animals_count: 8
+        trees_count: 5,
+        animals_count: 1
       },
       {
         id: 3,
@@ -47,32 +65,59 @@ class UserManagementService {
         is_active: true,
         created_at: '2024-02-01T09:45:00Z',
         updated_at: '2024-02-01T09:45:00Z',
-        trees_count: 32,
-        animals_count: 15
+        trees_count: 4,
+        animals_count: 1
       },
       {
         id: 4,
         email: 'erick@ieee.org',
         full_name: 'Erick Hansen (IEEE)',
-        role: 'admin',
+        role: 'explorer',
         is_active: true,
         created_at: '2024-02-10T16:20:00Z',
         updated_at: '2024-02-10T16:20:00Z',
-        trees_count: 45,
-        animals_count: 28
+        trees_count: 3,
+        animals_count: 1
       },
       {
         id: 5,
         email: 'erick@vibo.co',
         full_name: 'Erick Hansen (VIBO)',
-        role: 'admin',
+        role: 'explorer',
         is_active: true,
         created_at: '2024-02-15T11:30:00Z',
         updated_at: '2024-02-15T11:30:00Z',
-        trees_count: 38,
-        animals_count: 22
+        trees_count: 4,
+        animals_count: 0
+      },
+      {
+        id: 6,
+        email: 'nuevo.admin@test.com', // Usuario admin recién registrado
+        full_name: 'Nuevo Administrador',
+        role: 'admin',
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        trees_count: 0,
+        animals_count: 0
       }
     ];
+
+    // Guardar datos por defecto en localStorage
+    this.saveMockUsers(defaultUsers);
+    return defaultUsers;
+  }
+
+  /**
+   * Guardar usuarios mock en localStorage
+   */
+  saveMockUsers(users) {
+    try {
+      localStorage.setItem(this.mockDataKey, JSON.stringify(users));
+      console.log('💾 [UserManagement] Usuarios guardados en localStorage');
+    } catch (error) {
+      console.error('❌ [UserManagement] Error guardando en localStorage:', error);
+    }
   }
 
   getMockStats() {
@@ -112,12 +157,16 @@ class UserManagementService {
         return users;
       }
       
-      const response = await fetch(`${this.baseUrl}/admin/users`, {
+      // Usar endpoint corregido
+      const url = `${this.baseUrl.replace('/api', '')}/admin-users-fixed.php`;
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
+
+      console.log('🌐 [UserManagement] Conectando a:', url);
 
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
@@ -149,24 +198,49 @@ class UserManagementService {
         console.log('🔧 [UserManagement] Simulando actualización de usuario mock');
         await new Promise(resolve => setTimeout(resolve, 800)); // Simular delay de red
         
-        // Simular usuario actualizado
+        // Obtener usuarios actuales
+        const users = this.getMockUsers();
+        
+        // Actualizar el usuario específico
+        const updatedUsers = users.map(user => 
+          user.id === userId 
+            ? { 
+                ...user, 
+                ...userData, 
+                updated_at: new Date().toISOString(),
+                // No guardar la contraseña en los datos mock por seguridad
+                ...(userData.password && { password_updated: new Date().toISOString() })
+              }
+            : user
+        );
+        
+        // Guardar cambios en localStorage
+        this.saveMockUsers(updatedUsers);
+        
+        // Simular usuario actualizado (sin incluir contraseña en respuesta)
+        const { password, ...userDataWithoutPassword } = userData;
         const updatedUser = {
           id: userId,
-          ...userData,
-          updated_at: new Date().toISOString()
+          ...userDataWithoutPassword,
+          updated_at: new Date().toISOString(),
+          ...(password && { password_changed: true })
         };
         
-        console.log('✅ [UserManagement] Usuario mock actualizado exitosamente');
+        console.log('✅ [UserManagement] Usuario mock actualizado y guardado exitosamente');
         return updatedUser;
       }
       
-      const response = await fetch(`${this.baseUrl}/admin/users/${userId}`, {
+      // Usar endpoint corregido con ID en query params
+      const url = `${this.baseUrl.replace('/api', '')}/admin-users-fixed.php?id=${userId}`;
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(userData),
       });
+
+      console.log('🌐 [UserManagement] Actualizando usuario en:', url);
 
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
@@ -231,6 +305,19 @@ class UserManagementService {
         console.log('🔧 [UserManagement] Simulando cambio de estado mock');
         await new Promise(resolve => setTimeout(resolve, 600)); // Simular delay de red
         
+        // Obtener usuarios actuales
+        const users = this.getMockUsers();
+        
+        // Actualizar el usuario específico
+        const updatedUsers = users.map(user => 
+          user.id === userId 
+            ? { ...user, is_active: isActive, updated_at: new Date().toISOString() }
+            : user
+        );
+        
+        // Guardar cambios en localStorage
+        this.saveMockUsers(updatedUsers);
+        
         // Simular usuario con estado cambiado
         const updatedUser = {
           id: userId,
@@ -238,17 +325,22 @@ class UserManagementService {
           updated_at: new Date().toISOString()
         };
         
-        console.log('✅ [UserManagement] Estado de usuario mock cambiado exitosamente');
+        console.log('✅ [UserManagement] Estado de usuario mock cambiado y guardado exitosamente');
         return updatedUser;
       }
       
-      const response = await fetch(`${this.baseUrl}/admin/users/${userId}/status`, {
+      // Usar endpoint corregido
+      const url = `${this.baseUrl.replace('/api', '')}/admin-users-fixed.php?id=${userId}`;
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ is_active: isActive }),
       });
+
+      console.log('🌐 [UserManagement] Cambiando estado en:', url);
+      console.log('📤 [UserManagement] Enviando datos:', { is_active: isActive });
 
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
@@ -279,16 +371,30 @@ class UserManagementService {
       if (this.useMockData) {
         console.log('🔧 [UserManagement] Simulando eliminación de usuario mock');
         await new Promise(resolve => setTimeout(resolve, 700)); // Simular delay de red
-        console.log('✅ [UserManagement] Usuario mock eliminado exitosamente');
+        
+        // Obtener usuarios actuales
+        const users = this.getMockUsers();
+        
+        // Filtrar el usuario eliminado
+        const updatedUsers = users.filter(user => user.id !== userId);
+        
+        // Guardar cambios en localStorage
+        this.saveMockUsers(updatedUsers);
+        
+        console.log('✅ [UserManagement] Usuario mock eliminado y guardado exitosamente');
         return true;
       }
       
-      const response = await fetch(`${this.baseUrl}/admin/users/${userId}`, {
+      // Usar endpoint corregido con ID en query params
+      const url = `${this.baseUrl.replace('/api', '')}/admin-users-fixed.php?id=${userId}`;
+      const response = await fetch(url, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
       });
+
+      console.log('🌐 [UserManagement] Eliminando usuario en:', url);
 
       if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
@@ -324,25 +430,19 @@ class UserManagementService {
         return stats;
       }
       
-      const response = await fetch(`${this.baseUrl}/admin/stats/users`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`);
-      }
-
-      const result = await response.json();
+      // Usar endpoint simplificado - calcular estadísticas desde los usuarios
+      const users = await this.getAllUsers();
+      const stats = {
+        total_users: users.length,
+        active_users: users.filter(u => u.is_active).length,
+        inactive_users: users.filter(u => !u.is_active).length,
+        explorers: users.filter(u => u.role === 'explorer').length,
+        scientists: users.filter(u => u.role === 'scientist').length,
+        admins: users.filter(u => u.role === 'admin').length
+      };
       
-      if (result.success) {
-        console.log('✅ [UserManagement] Estadísticas obtenidas:', result.stats);
-        return result.stats;
-      } else {
-        throw new Error(result.message || 'Error obteniendo estadísticas');
-      }
+      console.log('✅ [UserManagement] Estadísticas calculadas:', stats);
+      return stats;
     } catch (error) {
       console.error('❌ [UserManagement] Error obteniendo estadísticas:', error);
       throw error;
