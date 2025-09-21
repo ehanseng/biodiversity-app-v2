@@ -80,19 +80,25 @@ try {
         // Hash de la contraseña
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
         
+        // Determinar el estado de aprobación para científicos
+        $scientist_approval_status = null;
+        if ($role === 'scientist') {
+            $scientist_approval_status = 'pending';
+        }
+        
         // Insertar nuevo usuario
         $stmt = $pdo->prepare("
-            INSERT INTO users (email, password_hash, full_name, role, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, NOW(), NOW())
+            INSERT INTO users (email, password_hash, full_name, role, scientist_approval_status, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, NOW(), NOW())
         ");
         
-        $result = $stmt->execute([$email, $password_hash, $full_name, $role]);
+        $result = $stmt->execute([$email, $password_hash, $full_name, $role, $scientist_approval_status]);
         
         if ($result) {
             $userId = $pdo->lastInsertId();
             
             // Obtener el usuario creado (sin password_hash)
-            $stmt = $pdo->prepare("SELECT id, email, full_name, role, created_at FROM users WHERE id = ?");
+            $stmt = $pdo->prepare("SELECT id, email, full_name, role, scientist_approval_status, is_active, created_at FROM users WHERE id = ?");
             $stmt->execute([$userId]);
             $newUser = $stmt->fetch(PDO::FETCH_ASSOC);
             

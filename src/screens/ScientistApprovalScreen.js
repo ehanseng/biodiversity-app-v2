@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, Platform, TextInput } from 'react-native';
 import SafeImage from '../components/SafeImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/SimpleAuthContext';
@@ -16,6 +16,8 @@ const ScientistApprovalScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('pending'); // pending, approved, rejected, all
+  const [typeFilter, setTypeFilter] = useState('all'); // all, flora, fauna
+  const [searchQuery, setSearchQuery] = useState('');
   const [processingRecords, setProcessingRecords] = useState(new Set());
 
   useEffect(() => {
@@ -25,9 +27,9 @@ const ScientistApprovalScreen = ({ navigation }) => {
   }, [profile]);
 
   useEffect(() => {
-    // Filtrar localmente cuando cambia el filtro
+    // Filtrar localmente cuando cambia el filtro, tipo o la búsqueda
     filterRecords();
-  }, [filter, allRecords]);
+  }, [filter, typeFilter, allRecords, searchQuery]);
 
   const loadTrees = async () => {
     try {
@@ -72,11 +74,16 @@ const ScientistApprovalScreen = ({ navigation }) => {
     console.log('🔍 [ScientistApproval] Filtrando registros:', {
       total: allRecords.length,
       filter: filter,
+      typeFilter: typeFilter,
+      searchQuery: searchQuery,
       pending: allRecords.filter(r => (r.status === 'pending' || r.approval_status === 'pending')).length,
       approved: allRecords.filter(r => (r.status === 'approved' || r.approval_status === 'approved')).length,
-      rejected: allRecords.filter(r => (r.status === 'rejected' || r.approval_status === 'rejected')).length
+      rejected: allRecords.filter(r => (r.status === 'rejected' || r.approval_status === 'rejected')).length,
+      flora: allRecords.filter(r => r.type === 'flora').length,
+      fauna: allRecords.filter(r => r.type === 'fauna').length
     });
     
+    // Aplicar filtro por estado
     if (filter === 'pending') {
       filtered = filtered.filter(record => record.status === 'pending' || record.approval_status === 'pending');
     } else if (filter === 'approved') {
@@ -84,7 +91,27 @@ const ScientistApprovalScreen = ({ navigation }) => {
     } else if (filter === 'rejected') {
       filtered = filtered.filter(record => record.status === 'rejected' || record.approval_status === 'rejected');
     }
-    // Si es 'all', no filtramos
+    // Si es 'all', no filtramos por estado
+    
+    // Aplicar filtro por tipo (plantas/animales)
+    if (typeFilter === 'flora') {
+      filtered = filtered.filter(record => record.type === 'flora');
+    } else if (typeFilter === 'fauna') {
+      filtered = filtered.filter(record => record.type === 'fauna');
+    }
+    // Si es 'all', no filtramos por tipo
+    
+    // Aplicar filtro de búsqueda por texto
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(record =>
+        record.common_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.scientific_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.location_description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.animal_class?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.family?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
     
     console.log('✅ [ScientistApproval] Registros filtrados:', filtered.length);
     setRecords(filtered);
@@ -99,6 +126,7 @@ const ScientistApprovalScreen = ({ navigation }) => {
   const approveRecord = async (record) => {
     try {
       console.log('✅ [ScientistApproval] Aprobando registro:', record.common_name, record.type);
+      console.log('✅ [ScientistApproval] Científico que aprueba - user.id:', user?.id, 'profile.id:', profile?.id);
       
       // Determinar qué endpoint usar según el tipo
       const endpoint = record.type === 'flora' ? 'simple-trees-endpoint.php' : 'simple-animals-endpoint.php';
@@ -109,7 +137,8 @@ const ScientistApprovalScreen = ({ navigation }) => {
         },
         body: JSON.stringify({
           id: record.id,
-          status: 'approved'
+          status: 'approved',
+          approved_by: user?.id || profile?.id // Enviar ID del científico que aprueba
         })
       });
 
@@ -455,13 +484,60 @@ const ScientistApprovalScreen = ({ navigation }) => {
         <FilterButton filterKey="all" title="Todos" count={totalCount} iconName="flask-outline" iconColor="#007bff" />
       </View>
 
+      {/* Búsqueda y Filtros Rápidos */}
+      <View style={styles.searchAndFiltersContainer}>
+        {/* Barra de búsqueda */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por nombre común, científico, descripción..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        {/* Filtros rápidos por tipo */}
+        <View style={styles.typeFiltersContainer}>
+          <TouchableOpacity 
+            style={[styles.typeFilterButton, typeFilter === 'all' && styles.activeTypeFilter]}
+            onPress={() => setTypeFilter('all')}
+          >
+            <Ionicons name="apps" size={16} color={typeFilter === 'all' ? '#fff' : '#666'} />
+            <Text style={[styles.typeFilterText, typeFilter === 'all' && styles.activeTypeFilterText]}>Todos</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.typeFilterButton, typeFilter === 'flora' && styles.activeTypeFilter]}
+            onPress={() => setTypeFilter('flora')}
+          >
+            <Ionicons name="leaf" size={16} color={typeFilter === 'flora' ? '#fff' : '#28a745'} />
+            <Text style={[styles.typeFilterText, typeFilter === 'flora' && styles.activeTypeFilterText]}>Plantas</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.typeFilterButton, typeFilter === 'fauna' && styles.activeTypeFilter]}
+            onPress={() => setTypeFilter('fauna')}
+          >
+            <Ionicons name="paw" size={16} color={typeFilter === 'fauna' ? '#fff' : '#CD853F'} />
+            <Text style={[styles.typeFilterText, typeFilter === 'fauna' && styles.activeTypeFilterText]}>Animales</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View style={styles.listWrapper}>
         {records.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="flask-outline" size={64} color="#ccc" />
             <Text style={styles.emptyTitle}>No hay registros</Text>
             <Text style={styles.emptySubtitle}>
-              {filter === 'pending' ? 'No hay registros pendientes de revisión' :
+              {searchQuery ? 'No se encontraron registros que coincidan con tu búsqueda' :
+               filter === 'pending' ? 'No hay registros pendientes de revisión' :
                filter === 'approved' ? 'No hay registros aprobados' :
                filter === 'rejected' ? 'No hay registros rechazados' :
                'No hay registros para revisar'}
@@ -535,6 +611,62 @@ const styles = StyleSheet.create({
   },
   activeFilterText: {
     color: '#ffffff',
+  },
+  searchAndFiltersContainer: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 15,
+    borderRadius: 25,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  typeFiltersContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  typeFilterButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  activeTypeFilter: {
+    backgroundColor: '#2d5016',
+    borderColor: '#2d5016',
+  },
+  typeFilterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginLeft: 4,
+  },
+  activeTypeFilterText: {
+    color: '#fff',
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
   },
   listWrapper: {
     flex: 1,

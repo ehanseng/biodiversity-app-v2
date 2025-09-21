@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
 import SimpleAnimalService from '../services/SimpleAnimalService';
 import RankingCard from '../components/RankingCard';
+import ScientistRankingCard from '../components/ScientistRankingCard';
+import RankingService from '../services/RankingService';
 import usePageTitle from '../hooks/usePageTitle';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
@@ -22,6 +24,13 @@ const HomeScreen = ({ navigation }) => {
     flora: 0,
     fauna: 0,
     explorerPoints: 0,
+  });
+  const [scientistStats, setScientistStats] = useState({
+    treesApproved: 0,
+    animalsApproved: 0,
+    totalApprovals: 0,
+    scientistPoints: 0,
+    position: 0,
   });
   const [syncing, setSyncing] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
@@ -57,14 +66,20 @@ const HomeScreen = ({ navigation }) => {
     const initializeApp = async () => {
       try {
         // 1. Cargar estadísticas actualizadas
-        await loadTreeStats();
+        await Promise.all([
+          loadTreeStats(),
+          loadScientistStats()
+        ]);
         
         // 2. Usuario ya está cargado en el contexto simple
         
       } catch (error) {
         console.error('❌ [HomeScreen] Error en inicialización:', error);
         // Si falla, al menos cargar estadísticas básicas
-        await loadTreeStats();
+        await Promise.all([
+          loadTreeStats(),
+          loadScientistStats()
+        ]);
       }
     };
     
@@ -123,16 +138,18 @@ const HomeScreen = ({ navigation }) => {
         console.log('👤 [HomeScreen] Estados de mis árboles:', myTrees.map(tree => tree.status));
       }
       
-      // Calcular estadísticas
+      // Calcular estadísticas según el rol del usuario
       const stats = {
         totalTrees: allTrees.length,
         myTrees: myTrees.length,
-        approvedTrees: allTrees.filter(tree => tree.status === 'approved').length,
-        pendingTrees: allTrees.filter(tree => tree.status === 'pending').length,
+        approvedTrees: myTrees.filter(tree => tree.status === 'approved').length,
+        pendingTrees: myTrees.filter(tree => tree.status === 'pending').length,
         rejectedTrees: allTrees.filter(tree => tree.status === 'rejected').length,
         localTrees: 0, // Ya no usamos localStorage
-        // Calcular flora y fauna aprobada del usuario actual
-        flora: myTrees.filter(tree => tree.status === 'approved').length, // Árboles aprobados del usuario
+        // Para exploradores y científicos no aprobados: árboles aprobados, para científicos aprobados: todos sus árboles
+        flora: (user?.role === 'explorer' || (user?.role === 'scientist' && user?.scientist_approval_status === 'pending'))
+          ? myTrees.filter(tree => tree.status === 'approved').length 
+          : myTrees.length,
         fauna: 0 // Por ahora solo tenemos árboles, fauna será 0
       };
       
@@ -160,12 +177,59 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const loadScientistStats = async () => {
+    try {
+      if (!user?.id || user?.role !== 'scientist' || user?.scientist_approval_status !== 'approved') {
+        return; // Solo cargar para científicos aprobados
+      }
+
+      console.log('🧪 [HomeScreen] Cargando estadísticas de científico...');
+      
+      const ranking = await RankingService.getScientistsRanking();
+      const currentScientist = ranking.find(scientist => scientist.id === user.id);
+      
+      if (currentScientist) {
+        setScientistStats({
+          treesApproved: currentScientist.trees_approved || 0,
+          animalsApproved: currentScientist.animals_approved || 0,
+          totalApprovals: currentScientist.total_approvals || 0,
+          scientistPoints: currentScientist.scientist_points || 0,
+          position: currentScientist.position || 0,
+        });
+        console.log('✅ [HomeScreen] Estadísticas de científico cargadas:', currentScientist);
+      } else {
+        // Si no está en el ranking, significa que no tiene aprobaciones
+        setScientistStats({
+          treesApproved: 0,
+          animalsApproved: 0,
+          totalApprovals: 0,
+          scientistPoints: 0,
+          position: 0,
+        });
+        console.log('ℹ️ [HomeScreen] Científico no encontrado en ranking (sin aprobaciones)');
+      }
+      
+    } catch (error) {
+      console.error('❌ [HomeScreen] Error cargando estadísticas de científico:', error);
+      setScientistStats({
+        treesApproved: 0,
+        animalsApproved: 0,
+        totalApprovals: 0,
+        scientistPoints: 0,
+        position: 0,
+      });
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       console.log('🔄 [HomeScreen] Refresh manual - recargando estadísticas...');
       // Recargar estadísticas
-      await loadTreeStats();
+      await Promise.all([
+        loadTreeStats(),
+        loadScientistStats()
+      ]);
     } catch (error) {
       console.error('❌ [HomeScreen] Error en refresh:', error);
     } finally {
@@ -238,28 +302,77 @@ const HomeScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Sección de Puntos de Explorador */}
-        <View style={styles.explorerPointsContainer}>
-          <View style={styles.explorerPointsCard}>
-            <View style={styles.explorerIconContainer}>
-              <Text style={styles.explorerIcon}>🧭</Text>
-            </View>
-            <View style={styles.explorerPointsInfo}>
-              <Text style={styles.explorerPointsTitle}>Puntos de Explorador</Text>
-              <Text style={styles.explorerPointsNumber}>{treeStats.explorerPoints}</Text>
-              <Text style={styles.explorerPointsSubtitle}>
-                {treeStats.flora} árboles × 10 + {treeStats.fauna} animales × 15
-              </Text>
-            </View>
-            <View style={styles.explorerBadge}>
-              <Text style={styles.explorerBadgeText}>
-                {treeStats.explorerPoints >= 100 ? '🏆 Experto' : 
-                 treeStats.explorerPoints >= 50 ? '🥇 Avanzado' : 
-                 treeStats.explorerPoints >= 20 ? '🥈 Intermedio' : '🥉 Novato'}
-              </Text>
+        {/* Mensaje para científicos en espera de aprobación */}
+        {user?.role === 'scientist' && user?.scientist_approval_status === 'pending' && (
+          <View style={styles.pendingApprovalContainer}>
+            <View style={styles.pendingApprovalCard}>
+              <View style={styles.pendingIconContainer}>
+                <Text style={styles.pendingIcon}>🧪</Text>
+              </View>
+              <View style={styles.pendingContent}>
+                <Text style={styles.pendingTitle}>Científico en Espera de Aprobación</Text>
+                <Text style={styles.pendingMessage}>
+                  Te has registrado como científico y tu cuenta está siendo revisada por un administrador. 
+                  Mientras tanto, puedes usar la aplicación como explorador.
+                </Text>
+                <Text style={styles.pendingNote}>
+                  Una vez aprobado, tendrás acceso completo a las funciones de científico.
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
+
+        {/* Sección de Puntos de Explorador - Para exploradores y científicos no aprobados */}
+        {(user?.role === 'explorer' || (user?.role === 'scientist' && user?.scientist_approval_status === 'pending')) && (
+          <View style={styles.explorerPointsContainer}>
+            <View style={styles.explorerPointsCard}>
+              <View style={styles.explorerIconContainer}>
+                <Text style={styles.explorerIcon}>🧭</Text>
+              </View>
+              <View style={styles.explorerPointsInfo}>
+                <Text style={styles.explorerPointsTitle}>Puntos de Explorador</Text>
+                <Text style={styles.explorerPointsNumber}>{treeStats.explorerPoints}</Text>
+                <Text style={styles.explorerPointsSubtitle}>
+                  {treeStats.flora} árboles × 10 + {treeStats.fauna} animales × 15
+                </Text>
+              </View>
+              <View style={styles.explorerBadge}>
+                <Text style={styles.explorerBadgeText}>
+                  {treeStats.explorerPoints >= 100 ? '🏆 Experto' : 
+                   treeStats.explorerPoints >= 50 ? '🥇 Avanzado' : 
+                   treeStats.explorerPoints >= 20 ? '🥈 Intermedio' : '🥉 Novato'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Sección de Puntos de Científico - Solo para científicos aprobados */}
+        {user?.role === 'scientist' && user?.scientist_approval_status === 'approved' && (
+          <View style={styles.scientistPointsContainer}>
+            <View style={styles.scientistPointsCard}>
+              <View style={styles.scientistIconContainer}>
+                <Text style={styles.scientistIcon}>🧪</Text>
+              </View>
+              <View style={styles.scientistPointsInfo}>
+                <Text style={styles.scientistPointsTitle}>Puntos de Científico</Text>
+                <Text style={styles.scientistPointsNumber}>{scientistStats.scientistPoints}</Text>
+                <Text style={styles.scientistPointsSubtitle}>
+                  {scientistStats.treesApproved} plantas × 10 + {scientistStats.animalsApproved} animales × 15
+                </Text>
+              </View>
+              <View style={styles.scientistBadge}>
+                <Text style={styles.scientistBadgeText}>
+                  {scientistStats.position > 0 ? `#${scientistStats.position} en ranking` : 'Sin ranking'}
+                </Text>
+                <Text style={styles.scientistRankText}>
+                  {scientistStats.totalApprovals} aprobaciones
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Indicador de Sincronización */}
         {treeStats.localTrees > 0 && (
@@ -295,39 +408,64 @@ const HomeScreen = ({ navigation }) => {
           </View>
         )}
 
-        {/* Estadísticas de la Comunidad */}
-        <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>🌱 Mis Registros Aprobados</Text>
-          
-          <View style={styles.communityStatsGrid}>
-            {/* Flora */}
-            <TouchableOpacity 
-              style={styles.communityStatCard}
-              onPress={() => navigation.navigate('Explorer', { initialFilter: 'approved' })}
-            >
-              <View style={styles.communityStatIcon}>
-                <Text style={styles.communityStatEmoji}>🌳</Text>
-              </View>
-              <Text style={styles.communityStatNumber}>{treeStats.flora || 0}</Text>
-              <Text style={styles.communityStatLabel}>Mis Árboles Aprobados</Text>
-            </TouchableOpacity>
+        {/* Estadísticas de Registros - Para exploradores y científicos (aprobados ven "creados", no aprobados ven "aprobados") */}
+        {(user?.role === 'explorer' || user?.role === 'scientist') && (
+          <View style={styles.statsContainer}>
+            <Text style={styles.sectionTitle}>
+              {(user?.role === 'explorer' || (user?.role === 'scientist' && user?.scientist_approval_status === 'pending')) 
+                ? '🌱 Mis Registros Aprobados' 
+                : '📝 Mis Registros Creados'}
+            </Text>
             
-            {/* Fauna */}
-            <TouchableOpacity 
-              style={styles.communityStatCard}
-              onPress={() => navigation.navigate('Explorer', { initialFilter: 'approved' })}
-            >
-              <View style={styles.communityStatIcon}>
-                <Text style={styles.communityStatEmoji}>🐾</Text>
-              </View>
-              <Text style={styles.communityStatNumber}>{treeStats.fauna || 0}</Text>
-              <Text style={styles.communityStatLabel}>Mis Animales Aprobados</Text>
-            </TouchableOpacity>
+            <View style={styles.communityStatsGrid}>
+              {/* Flora */}
+              <TouchableOpacity 
+                style={styles.communityStatCard}
+                onPress={() => navigation.navigate('Explorer', { 
+                  initialFilter: (user?.role === 'explorer' || (user?.role === 'scientist' && user?.scientist_approval_status === 'pending')) 
+                    ? 'approved' 
+                    : 'mine' 
+                })}
+              >
+                <View style={styles.communityStatIcon}>
+                  <Text style={styles.communityStatEmoji}>🌳</Text>
+                </View>
+                <Text style={styles.communityStatNumber}>{treeStats.flora || 0}</Text>
+                <Text style={styles.communityStatLabel}>
+                  {(user?.role === 'explorer' || (user?.role === 'scientist' && user?.scientist_approval_status === 'pending')) 
+                    ? 'Mis Árboles Aprobados' 
+                    : 'Árboles Registrados'}
+                </Text>
+              </TouchableOpacity>
+              
+              {/* Fauna */}
+              <TouchableOpacity 
+                style={styles.communityStatCard}
+                onPress={() => navigation.navigate('AnimalExplorer', { 
+                  initialFilter: (user?.role === 'explorer' || (user?.role === 'scientist' && user?.scientist_approval_status === 'pending')) 
+                    ? 'approved' 
+                    : 'mine' 
+                })}
+              >
+                <View style={styles.communityStatIcon}>
+                  <Text style={styles.communityStatEmoji}>🐾</Text>
+                </View>
+                <Text style={styles.communityStatNumber}>{treeStats.fauna || 0}</Text>
+                <Text style={styles.communityStatLabel}>
+                  {(user?.role === 'explorer' || (user?.role === 'scientist' && user?.scientist_approval_status === 'pending')) 
+                    ? 'Mis Animales Aprobados' 
+                    : 'Animales Registrados'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Ranking de Exploradores */}
         <RankingCard />
+
+        {/* Ranking de Científicos */}
+        <ScientistRankingCard />
 
         {/* Indicador animado hacia abajo */}
         <View style={styles.scrollIndicatorContainer}>
@@ -471,6 +609,137 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#2d5016',
+  },
+  // Estilos para sección de puntos de científico
+  scientistPointsContainer: {
+    padding: 15,
+    paddingBottom: 0,
+  },
+  scientistPointsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007bff',
+  },
+  scientistIconContainer: {
+    backgroundColor: '#e3f2fd',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  scientistIcon: {
+    fontSize: 40,
+  },
+  scientistPointsInfo: {
+    flex: 1,
+  },
+  scientistPointsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007bff',
+    marginBottom: 5,
+  },
+  scientistPointsNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#007bff',
+    marginBottom: 3,
+  },
+  scientistPointsSubtitle: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontStyle: 'italic',
+  },
+  scientistBadge: {
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#007bff',
+    alignItems: 'center',
+  },
+  scientistBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#007bff',
+    marginBottom: 2,
+  },
+  scientistRankText: {
+    fontSize: 10,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
+  // Estilos para mensaje de perfil en revisión
+  pendingApprovalContainer: {
+    padding: 15,
+    paddingBottom: 0,
+  },
+  pendingApprovalCard: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 15,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffc107',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  pendingIconContainer: {
+    backgroundColor: '#fff',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+    borderWidth: 2,
+    borderColor: '#ffc107',
+  },
+  pendingIcon: {
+    fontSize: 24,
+  },
+  pendingContent: {
+    flex: 1,
+  },
+  pendingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 8,
+  },
+  pendingMessage: {
+    fontSize: 14,
+    color: '#856404',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  pendingNote: {
+    fontSize: 12,
+    color: '#6c5700',
+    fontStyle: 'italic',
+    lineHeight: 16,
   },
   syncIndicator: {
     backgroundColor: '#fff3cd',

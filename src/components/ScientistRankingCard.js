@@ -3,11 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } 
 import { Ionicons } from '@expo/vector-icons';
 import RankingService from '../services/RankingService';
 
-const RankingCard = () => {
+const ScientistRankingCard = () => {
   const [ranking, setRanking] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     loadRanking();
@@ -16,11 +15,11 @@ const RankingCard = () => {
   const loadRanking = async () => {
     try {
       setLoading(true);
-      const rankingData = await RankingService.getRanking();
-      console.log('🏆 [RankingCard] Datos recibidos:', rankingData);
+      const rankingData = await RankingService.getScientistsRanking();
+      console.log('🧪 [ScientistRankingCard] Datos recibidos:', rankingData);
       setRanking(rankingData || []);
     } catch (error) {
-      console.error('❌ [RankingCard] Error cargando ranking:', error);
+      console.error('❌ [ScientistRankingCard] Error cargando ranking:', error);
       setRanking([]); // Asegurar que sea un array vacío
     } finally {
       setLoading(false);
@@ -30,12 +29,9 @@ const RankingCard = () => {
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      // Actualizar puntos de todos los usuarios primero
-      await RankingService.updateAllPoints();
-      // Luego cargar el ranking actualizado
       await loadRanking();
     } catch (error) {
-      console.error('Error refrescando ranking:', error);
+      console.error('Error refrescando ranking de científicos:', error);
     } finally {
       setRefreshing(false);
     }
@@ -55,48 +51,49 @@ const RankingCard = () => {
       case 1: return '#FFD700';
       case 2: return '#C0C0C0';
       case 3: return '#CD7F32';
-      default: return '#28a745';
+      default: return '#007bff';
     }
   };
 
-  const displayedRanking = expanded ? ranking : ranking.slice(0, 5);
-
   if (loading) {
+    console.log('🧪 [ScientistRankingCard] Renderizando estado loading');
     return (
       <View style={styles.card}>
         <View style={styles.header}>
-          <Ionicons name="trophy-outline" size={24} color="#2d5016" />
-          <Text style={styles.title}>Top 5 Exploradores</Text>
+          <Ionicons name="flask-outline" size={24} color="#007bff" />
+          <Text style={styles.title}>Top 3 Científicos</Text>
         </View>
-        <Text style={styles.loadingText}>Cargando ranking de exploradores...</Text>
+        <Text style={styles.loadingText}>Cargando ranking de científicos...</Text>
       </View>
     );
   }
 
   if (ranking.length === 0) {
+    console.log('🧪 [ScientistRankingCard] Renderizando estado vacío');
     return (
       <View style={styles.card}>
         <View style={styles.header}>
-          <Ionicons name="trophy-outline" size={24} color="#2d5016" />
-          <Text style={styles.title}>Top 5 Exploradores</Text>
+          <Ionicons name="flask-outline" size={24} color="#007bff" />
+          <Text style={styles.title}>Top 3 Científicos</Text>
         </View>
-        <Text style={styles.emptyText}>No hay datos de ranking disponibles</Text>
+        <Text style={styles.emptyText}>No hay datos de ranking de científicos</Text>
       </View>
     );
   }
 
+  console.log('🧪 [ScientistRankingCard] Renderizando con datos:', ranking.length, 'científicos');
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Ionicons name="trophy-outline" size={24} color="#2d5016" />
-          <Text style={styles.title}>Top 5 Exploradores</Text>
+          <Ionicons name="flask-outline" size={24} color="#007bff" />
+          <Text style={styles.title}>Top 3 Científicos</Text>
         </View>
         <TouchableOpacity onPress={handleRefresh} disabled={refreshing}>
           <Ionicons 
             name="refresh-outline" 
             size={20} 
-            color={refreshing ? "#ccc" : "#2d5016"} 
+            color={refreshing ? "#ccc" : "#007bff"} 
           />
         </TouchableOpacity>
       </View>
@@ -107,48 +104,32 @@ const RankingCard = () => {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {displayedRanking.map((user, index) => (
-          <View key={user.id} style={styles.rankingItem}>
+        {ranking.map((scientist, index) => (
+          <View key={scientist.id} style={styles.rankingItem}>
             <View style={styles.rankingLeft}>
-              <Text style={[styles.medal, { color: getMedalColor(user.position) }]}>
-                {getMedalIcon(user.position)}
+              <Text style={[styles.medal, { color: getMedalColor(scientist.position) }]}>
+                {getMedalIcon(scientist.position)}
               </Text>
               <View style={styles.userInfo}>
                 <Text style={styles.userName} numberOfLines={1}>
-                  {user.full_name}
+                  {scientist.full_name}
                 </Text>
                 <Text style={styles.userStats}>
-                  {user.total_approved} registros aprobados
+                  {scientist.trees_approved} plantas + {scientist.animals_approved} animales
                 </Text>
               </View>
             </View>
             
             <View style={styles.rankingRight}>
               <View style={styles.pointsContainer}>
-                <Ionicons name="compass-outline" size={16} color="#2d5016" />
-                <Text style={styles.points}>{user.explorer_points}</Text>
+                <Ionicons name="flask-outline" size={16} color="#007bff" />
+                <Text style={styles.points}>{scientist.scientist_points || scientist.total_approvals}</Text>
               </View>
-              <Text style={styles.position}>#{user.position}</Text>
+              <Text style={styles.position}>#{scientist.position}</Text>
             </View>
           </View>
         ))}
       </ScrollView>
-
-      {ranking.length > 5 && (
-        <TouchableOpacity 
-          style={styles.expandButton}
-          onPress={() => setExpanded(!expanded)}
-        >
-          <Text style={styles.expandText}>
-            {expanded ? 'Ver menos' : `Ver todos (${ranking.length})`}
-          </Text>
-          <Ionicons 
-            name={expanded ? "chevron-up-outline" : "chevron-down-outline"} 
-            size={16} 
-            color="#2d5016" 
-          />
-        </TouchableOpacity>
-      )}
     </View>
   );
 };
@@ -178,7 +159,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2d5016',
+    color: '#007bff',
     marginLeft: 8,
   },
   loadingText: {
@@ -194,7 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   rankingContainer: {
-    maxHeight: 300,
+    maxHeight: 200,
   },
   rankingItem: {
     flexDirection: 'row',
@@ -236,7 +217,7 @@ const styles = StyleSheet.create({
   points: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#2d5016',
+    color: '#007bff',
     marginLeft: 4,
   },
   position: {
@@ -244,21 +225,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
-  expandButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    marginTop: 8,
-  },
-  expandText: {
-    fontSize: 14,
-    color: '#2d5016',
-    fontWeight: '500',
-    marginRight: 4,
-  },
 });
 
-export default RankingCard;
+export default ScientistRankingCard;

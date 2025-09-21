@@ -177,6 +177,11 @@ try {
                 $updateFields[] = "scientific_name = ?";
                 $updateValues[] = $input['scientific_name'];
             }
+            if (isset($input['approved_by'])) {
+                $updateFields[] = "approved_by = ?";
+                $updateValues[] = $input['approved_by'];
+                error_log("[simple-trees-endpoint] Asignando aprobación al científico ID: " . $input['approved_by']);
+            }
             
             if (empty($updateFields)) {
                 error_log("[simple-trees-endpoint] Error: No hay campos para actualizar");

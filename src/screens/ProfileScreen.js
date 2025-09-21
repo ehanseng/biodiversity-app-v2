@@ -85,22 +85,6 @@ const ProfileScreen = ({ navigation }) => {
           <Ionicons name="chevron-forward" size={20} color="#dc3545" />
         </TouchableOpacity>
 
-        {/* Acciones específicas por rol */}
-        {(profile?.role === 'scientist' || profile?.role === 'admin') && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {profile?.role === 'scientist' ? ' Herramientas de Científico' : ' Herramientas de Administrador'}
-            </Text>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Scientist')}
-            >
-              <Ionicons name="checkmark-done-circle" size={24} color="#007bff" />
-              <Text style={styles.actionButtonText}>Revisión Científica</Text>
-              <Ionicons name="chevron-forward" size={20} color="#999" />
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </View>
   );
@@ -178,31 +162,6 @@ const styles = StyleSheet.create({
     color: '#dc3545',
     marginLeft: 15,
     fontWeight: '500',
-  },
-  section: {
-    marginTop: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2d5016',
-    marginBottom: 10,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    elevation: 2,
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-  },
-  actionButtonText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#2d5016',
-    marginLeft: 15,
   },
 });
 

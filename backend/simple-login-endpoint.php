@@ -60,7 +60,7 @@ try {
         }
         
         // Buscar usuario por email
-        $stmt = $pdo->prepare("SELECT id, email, full_name, role, password_hash FROM users WHERE email = ?");
+        $stmt = $pdo->prepare("SELECT id, email, full_name, role, scientist_approval_status, is_active, password_hash FROM users WHERE email = ?");
         $stmt->execute([$input['email']]);
         $user = $stmt->fetch();
         

@@ -30,6 +30,38 @@ class RankingService {
     }
   }
 
+  // Obtener ranking de científicos (top 5)
+  async getScientistsRanking() {
+    try {
+      console.log('🧪 [RankingService] Obteniendo ranking de científicos');
+      console.log('🧪 [RankingService] URL:', `${this.baseURL}/ranking-endpoint.php?action=scientists_ranking`);
+      
+      const response = await fetch(`${this.baseURL}/ranking-endpoint.php?action=scientists_ranking`);
+      
+      console.log('🧪 [RankingService] Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('🧪 [RankingService] Response completa:', result);
+      
+      if (result.success) {
+        console.log('✅ [RankingService] Ranking de científicos obtenido:', result.ranking.length, 'científicos');
+        console.log('✅ [RankingService] Mock data:', result.mock_data);
+        return result.ranking;
+      } else {
+        throw new Error(result.error || 'Error obteniendo ranking de científicos');
+      }
+      
+    } catch (error) {
+      console.error('❌ [RankingService] Error obteniendo ranking de científicos:', error.message);
+      console.error('❌ [RankingService] Error completo:', error);
+      return []; // Devolver array vacío en caso de error
+    }
+  }
+
   // Obtener estadísticas generales
   async getStats() {
     try {

@@ -47,11 +47,11 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
 
       const userData = await userService.loginUser(email, password);
-      
-      setUser(userData);
-      SafeStorage.setJSON('biodiversity_user', userData);
-      
-      console.log('✅ [SimpleAuth] Login exitoso:', userData.email);
+    
+    setUser(userData);
+    SafeStorage.setJSON('biodiversity_user', userData);
+    
+    console.log('✅ [SimpleAuth] Login exitoso:', userData.email);
       return { success: true, user: userData };
       
     } catch (error) {

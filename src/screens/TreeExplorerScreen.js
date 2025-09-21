@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SafeImage from '../components/SafeImage';
 import CustomHeader from '../components/CustomHeader';
@@ -12,13 +12,19 @@ const TreeExplorerScreen = ({ navigation }) => {
   usePageTitle('Plantas'); // Actualizar título de la página
   
   const [trees, setTrees] = useState([]);
+  const [filteredTrees, setFilteredTrees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadTrees();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [trees, filter, searchQuery]);
 
   const loadTrees = async () => {
     try {
@@ -53,29 +59,50 @@ const TreeExplorerScreen = ({ navigation }) => {
     return userId && treeUserId === userId;
   };
 
-  const getFilteredTrees = () => {
+  const applyFilters = () => {
+    let filtered = trees;
+
+    // Aplicar filtro por estado
     switch (filter) {
       case 'all':
         // Mostrar SOLO los aprobados (propios y de la comunidad)
-        return trees.filter(tree => {
+        filtered = filtered.filter(tree => {
           const status = tree.status || tree.approval_status;
           return status === 'approved';
         });
+        break;
       case 'mine':
-        return trees.filter(tree => isMyTree(tree));
+        filtered = filtered.filter(tree => isMyTree(tree));
+        break;
       case 'approved':
-        return trees.filter(tree => isMyTree(tree) && (tree.status === 'approved' || tree.approval_status === 'approved'));
+        filtered = filtered.filter(tree => isMyTree(tree) && (tree.status === 'approved' || tree.approval_status === 'approved'));
+        break;
       case 'pending':
-        return trees.filter(tree => isMyTree(tree) && (tree.status === 'pending' || tree.approval_status === 'pending'));
+        filtered = filtered.filter(tree => isMyTree(tree) && (tree.status === 'pending' || tree.approval_status === 'pending'));
+        break;
       case 'rejected':
-        return trees.filter(tree => isMyTree(tree) && (tree.status === 'rejected' || tree.approval_status === 'rejected'));
+        filtered = filtered.filter(tree => isMyTree(tree) && (tree.status === 'rejected' || tree.approval_status === 'rejected'));
+        break;
       default:
         // Por defecto mostrar solo aprobados
-        return trees.filter(tree => {
+        filtered = filtered.filter(tree => {
           const status = tree.status || tree.approval_status;
           return status === 'approved';
         });
+        break;
     }
+
+    // Aplicar filtro de búsqueda por texto
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(tree =>
+        tree.common_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tree.scientific_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tree.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tree.location_description?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredTrees(filtered);
   };
 
   const getStatusColor = (tree) => {
@@ -171,7 +198,6 @@ const TreeExplorerScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const filteredTrees = getFilteredTrees();
 
   // Contadores
   const allCount = trees.filter(tree => {
@@ -202,12 +228,29 @@ const TreeExplorerScreen = ({ navigation }) => {
         <FilterButton filterKey="rejected" title="Rechazados" count={rejectedCount} iconName="close-circle-outline" iconColor="#dc3545" />
       </View>
 
+      {/* Búsqueda */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar plantas por nombre común, científico, descripción..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {filteredTrees.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="leaf-outline" size={64} color="#ccc" />
           <Text style={styles.emptyTitle}>No hay árboles</Text>
           <Text style={styles.emptySubtitle}>
-            {filter === 'mine' ? 'Aún no has registrado ningún árbol' : 'No se encontraron árboles con este filtro'}
+            {searchQuery ? 'No se encontraron plantas que coincidan con tu búsqueda' : 
+             filter === 'mine' ? 'Aún no has registrado ningún árbol' : 'No se encontraron árboles con este filtro'}
           </Text>
         </View>
       ) : (
@@ -262,6 +305,29 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#666', marginTop: 16 },
   emptySubtitle: { fontSize: 14, color: '#999', textAlign: 'center', marginTop: 8 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 15,
+    marginVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+  },
   fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#28a745', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 }
 });
 

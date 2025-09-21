@@ -109,7 +109,7 @@ const MainTabs = () => {
         options={{ title: 'Animales' }}
       />
       
-      {profile?.role === 'scientist' && <Tab.Screen name="Scientist" component={ScientistApprovalScreen} options={{ title: 'Científico' }} />}
+      {profile?.role === 'scientist' && profile?.scientist_approval_status === 'approved' && <Tab.Screen name="Scientist" component={ScientistApprovalScreen} options={{ title: 'Científico' }} />}
       {profile?.role === 'admin' && <Tab.Screen name="Admin" component={AdminScreen} />}
 
       <Tab.Screen 

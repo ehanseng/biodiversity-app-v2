@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SafeImage from '../components/SafeImage';
 import CustomHeader from '../components/CustomHeader';
@@ -12,13 +12,19 @@ const AnimalExplorerScreen = ({ navigation }) => {
   usePageTitle('Animales'); // Actualizar título de la página
   
   const [animals, setAnimals] = useState([]);
+  const [filteredAnimals, setFilteredAnimals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadAnimals();
   }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [animals, filter, searchQuery]);
 
   const loadAnimals = async () => {
     try {
@@ -48,29 +54,51 @@ const AnimalExplorerScreen = ({ navigation }) => {
     return userId && animalUserId === userId;
   };
 
-  const getFilteredAnimals = () => {
+  const applyFilters = () => {
+    let filtered = animals;
+
+    // Aplicar filtro por estado
     switch (filter) {
       case 'all':
         // Mostrar SOLO los aprobados (propios y de la comunidad)
-        return animals.filter(animal => {
+        filtered = filtered.filter(animal => {
           const status = animal.status || animal.approval_status;
           return status === 'approved';
         });
+        break;
       case 'mine':
-        return animals.filter(animal => isMyAnimal(animal));
+        filtered = filtered.filter(animal => isMyAnimal(animal));
+        break;
       case 'approved':
-        return animals.filter(animal => isMyAnimal(animal) && (animal.status === 'approved' || animal.approval_status === 'approved'));
+        filtered = filtered.filter(animal => isMyAnimal(animal) && (animal.status === 'approved' || animal.approval_status === 'approved'));
+        break;
       case 'pending':
-        return animals.filter(animal => isMyAnimal(animal) && (animal.status === 'pending' || animal.approval_status === 'pending'));
+        filtered = filtered.filter(animal => isMyAnimal(animal) && (animal.status === 'pending' || animal.approval_status === 'pending'));
+        break;
       case 'rejected':
-        return animals.filter(animal => isMyAnimal(animal) && (animal.status === 'rejected' || animal.approval_status === 'rejected'));
+        filtered = filtered.filter(animal => isMyAnimal(animal) && (animal.status === 'rejected' || animal.approval_status === 'rejected'));
+        break;
       default:
         // Por defecto mostrar solo aprobados
-        return animals.filter(animal => {
+        filtered = filtered.filter(animal => {
           const status = animal.status || animal.approval_status;
           return status === 'approved';
         });
+        break;
     }
+
+    // Aplicar filtro de búsqueda por texto
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(animal =>
+        animal.common_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        animal.scientific_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        animal.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        animal.location_description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        animal.animal_class?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredAnimals(filtered);
   };
 
   const getStatusColor = (animal) => {
@@ -166,7 +194,6 @@ const AnimalExplorerScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const filteredAnimals = getFilteredAnimals();
 
   // Contadores
   const allCount = animals.filter(animal => {
@@ -197,12 +224,29 @@ const AnimalExplorerScreen = ({ navigation }) => {
         <FilterButton filterKey="rejected" title="Rechazados" count={rejectedCount} iconName="close-circle-outline" iconColor="#dc3545" />
       </View>
 
+      {/* Búsqueda */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar animales por nombre común, científico, clase, descripción..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color="#666" />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {filteredAnimals.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="paw-outline" size={64} color="#ccc" />
           <Text style={styles.emptyTitle}>No hay animales</Text>
           <Text style={styles.emptySubtitle}>
-            {filter === 'mine' ? 'Aún no has registrado ningún animal' : 'No se encontraron animales con este filtro'}
+            {searchQuery ? 'No se encontraron animales que coincidan con tu búsqueda' : 
+             filter === 'mine' ? 'Aún no has registrado ningún animal' : 'No se encontraron animales con este filtro'}
           </Text>
         </View>
       ) : (
@@ -257,6 +301,29 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#666', marginTop: 16 },
   emptySubtitle: { fontSize: 14, color: '#999', textAlign: 'center', marginTop: 8 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    marginHorizontal: 15,
+    marginVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+  },
   fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#CD853F', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 }
 });
 
