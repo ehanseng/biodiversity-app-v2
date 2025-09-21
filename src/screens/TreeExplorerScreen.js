@@ -98,8 +98,15 @@ const TreeExplorerScreen = ({ navigation }) => {
     }
   };
 
-  const renderTreeItem = ({ item: tree }) => (
-    <TouchableOpacity style={styles.treeCard}>
+  const renderTreeItem = ({ item: tree }) => {
+    // Debug: Ver qué campos están disponibles
+    if (filter === 'all') {
+      console.log('🔍 [TreeExplorer] Campos disponibles:', Object.keys(tree));
+      console.log('🔍 [TreeExplorer] user_name:', tree.user_name);
+    }
+    
+    return (
+      <TouchableOpacity style={styles.treeCard}>
       <View style={styles.treeHeader}>
         <View style={styles.treeInfo}>
           <Text style={styles.treeName}>{tree.common_name}</Text>
@@ -128,12 +135,23 @@ const TreeExplorerScreen = ({ navigation }) => {
           </Text>
         </View>
         
-        <Text style={styles.dateText}>
-          {new Date(tree.created_at).toLocaleDateString()}
-        </Text>
+        <View style={styles.footerRight}>
+          {filter === 'all' && (tree.user_name || tree.full_name || tree.user_id) && (
+            <View style={styles.explorerInfo}>
+              <Ionicons name="person-outline" size={14} color="#28a745" />
+              <Text style={styles.explorerText}>
+                {tree.user_name || tree.full_name || `Usuario ${tree.user_id}`}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.dateText}>
+            {new Date(tree.created_at).toLocaleDateString()}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   const FilterButton = ({ filterKey, title, count, iconName, iconColor }) => (
     <TouchableOpacity
@@ -235,6 +253,9 @@ const styles = StyleSheet.create({
   treeFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15 },
   locationInfo: { flexDirection: 'row', alignItems: 'center' },
   locationText: { fontSize: 12, color: '#666', marginLeft: 4 },
+  footerRight: { alignItems: 'flex-end' },
+  explorerInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  explorerText: { fontSize: 11, color: '#28a745', marginLeft: 3, fontWeight: '500' },
   dateText: { fontSize: 12, color: '#666' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#666', marginTop: 16 },

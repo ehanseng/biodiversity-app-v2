@@ -93,8 +93,15 @@ const AnimalExplorerScreen = ({ navigation }) => {
     }
   };
 
-  const renderAnimalItem = ({ item: animal }) => (
-    <TouchableOpacity style={styles.animalCard}>
+  const renderAnimalItem = ({ item: animal }) => {
+    // Debug: Ver qué campos están disponibles
+    if (filter === 'all') {
+      console.log('🔍 [AnimalExplorer] Campos disponibles:', Object.keys(animal));
+      console.log('🔍 [AnimalExplorer] user_name:', animal.user_name);
+    }
+    
+    return (
+      <TouchableOpacity style={styles.animalCard}>
       <View style={styles.animalHeader}>
         <View style={styles.animalInfo}>
           <Text style={styles.animalName}>{animal.common_name}</Text>
@@ -123,12 +130,23 @@ const AnimalExplorerScreen = ({ navigation }) => {
           </Text>
         </View>
         
-        <Text style={styles.dateText}>
-          {new Date(animal.created_at).toLocaleDateString()}
-        </Text>
+        <View style={styles.footerRight}>
+          {filter === 'all' && (animal.user_name || animal.full_name || animal.user_id) && (
+            <View style={styles.explorerInfo}>
+              <Ionicons name="person-outline" size={14} color="#CD853F" />
+              <Text style={styles.explorerText}>
+                {animal.user_name || animal.full_name || `Usuario ${animal.user_id}`}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.dateText}>
+            {new Date(animal.created_at).toLocaleDateString()}
+          </Text>
+        </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   const FilterButton = ({ filterKey, title, count, iconName, iconColor }) => (
     <TouchableOpacity
@@ -230,6 +248,9 @@ const styles = StyleSheet.create({
   animalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15 },
   locationInfo: { flexDirection: 'row', alignItems: 'center' },
   locationText: { fontSize: 12, color: '#666', marginLeft: 4 },
+  footerRight: { alignItems: 'flex-end' },
+  explorerInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  explorerText: { fontSize: 11, color: '#CD853F', marginLeft: 3, fontWeight: '500' },
   dateText: { fontSize: 12, color: '#666' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#666', marginTop: 16 },

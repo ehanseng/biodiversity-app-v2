@@ -49,7 +49,13 @@ try {
                 $userId = $_GET['user_id'];
                 error_log("[simple-trees-endpoint] Obteniendo árboles del usuario: $userId");
                 
-                $stmt = $pdo->prepare("SELECT * FROM trees WHERE user_id = ? ORDER BY created_at DESC");
+                $stmt = $pdo->prepare("
+                    SELECT t.*, u.full_name as user_name 
+                    FROM trees t 
+                    LEFT JOIN users u ON t.user_id = u.id 
+                    WHERE t.user_id = ? 
+                    ORDER BY t.created_at DESC
+                ");
                 $stmt->execute([$userId]);
                 $trees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
@@ -60,7 +66,12 @@ try {
                 // Obtener todos los árboles
                 error_log("[simple-trees-endpoint] Obteniendo todos los árboles");
                 
-                $stmt = $pdo->query("SELECT * FROM trees ORDER BY created_at DESC");
+                $stmt = $pdo->query("
+                    SELECT t.*, u.full_name as user_name 
+                    FROM trees t 
+                    LEFT JOIN users u ON t.user_id = u.id 
+                    ORDER BY t.created_at DESC
+                ");
                 $trees = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 error_log("[simple-trees-endpoint] Total de árboles: " . count($trees));
@@ -133,10 +144,87 @@ try {
             break;
             
         case 'PUT':
-            // Actualizar árbol (implementar si es necesario)
-            error_log("[simple-trees-endpoint] PUT no implementado aún");
-            http_response_code(501);
-            echo json_encode(['error' => 'PUT no implementado']);
+            // Actualizar árbol (especialmente para cambios de estado)
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!$input || !isset($input['id'])) {
+                error_log("[simple-trees-endpoint] Error: ID requerido para actualización");
+                http_response_code(400);
+                echo json_encode(['error' => 'ID es requerido']);
+                exit();
+            }
+            
+            $treeId = $input['id'];
+            error_log("[simple-trees-endpoint] Actualizando árbol: $treeId");
+            
+            // Construir query dinámicamente
+            $updateFields = [];
+            $updateValues = [];
+            
+            if (isset($input['status'])) {
+                $updateFields[] = "status = ?";
+                $updateValues[] = $input['status'];
+            }
+            if (isset($input['approval_status'])) {
+                $updateFields[] = "approval_status = ?";
+                $updateValues[] = $input['approval_status'];
+            }
+            if (isset($input['common_name'])) {
+                $updateFields[] = "common_name = ?";
+                $updateValues[] = $input['common_name'];
+            }
+            if (isset($input['scientific_name'])) {
+                $updateFields[] = "scientific_name = ?";
+                $updateValues[] = $input['scientific_name'];
+            }
+            
+            if (empty($updateFields)) {
+                error_log("[simple-trees-endpoint] Error: No hay campos para actualizar");
+                http_response_code(400);
+                echo json_encode(['error' => 'No hay campos para actualizar']);
+                exit();
+            }
+            
+            $updateFields[] = "updated_at = NOW()";
+            $updateValues[] = $treeId;
+            
+            $sql = "UPDATE trees SET " . implode(', ', $updateFields) . " WHERE id = ?";
+            $stmt = $pdo->prepare($sql);
+            $result = $stmt->execute($updateValues);
+            
+            if ($result) {
+                // Si se cambió el estado a 'approved', actualizar puntos del usuario
+                if (isset($input['status']) && $input['status'] === 'approved') {
+                    // Obtener user_id del árbol
+                    $userStmt = $pdo->prepare("SELECT user_id FROM trees WHERE id = ?");
+                    $userStmt->execute([$treeId]);
+                    $tree = $userStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($tree) {
+                        // Actualizar puntos del usuario
+                        $pointsStmt = $pdo->prepare("
+                            UPDATE users SET explorer_points = (
+                                (SELECT COUNT(*) FROM trees WHERE user_id = ? AND status = 'approved') * 10 +
+                                (SELECT COUNT(*) FROM animals WHERE user_id = ? AND status = 'approved') * 15
+                            ) WHERE id = ?
+                        ");
+                        $pointsStmt->execute([$tree['user_id'], $tree['user_id'], $tree['user_id']]);
+                        error_log("[simple-trees-endpoint] Puntos actualizados para usuario: " . $tree['user_id']);
+                    }
+                }
+                
+                // Obtener el árbol actualizado
+                $stmt = $pdo->prepare("SELECT * FROM trees WHERE id = ?");
+                $stmt->execute([$treeId]);
+                $updatedTree = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                error_log("[simple-trees-endpoint] Árbol actualizado exitosamente: $treeId");
+                echo json_encode($updatedTree);
+            } else {
+                error_log("[simple-trees-endpoint] Error al actualizar árbol");
+                http_response_code(500);
+                echo json_encode(['error' => 'Error al actualizar árbol']);
+            }
             break;
             
         case 'DELETE':

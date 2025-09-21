@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import SimpleTreeService from '../services/SimpleTreeService';
 import SimpleAnimalService from '../services/SimpleAnimalService';
+import RankingCard from '../components/RankingCard';
 import usePageTitle from '../hooks/usePageTitle';
 import eventEmitter, { EVENTS } from '../utils/EventEmitter';
 
@@ -135,8 +136,8 @@ const HomeScreen = ({ navigation }) => {
         fauna: 0 // Por ahora solo tenemos árboles, fauna será 0
       };
       
-      // Calcular puntos de explorador: árboles x 100 + animales x 200
-      const explorerPoints = (stats.flora * 100) + (stats.fauna * 200);
+      // Calcular puntos de explorador: árboles x 10 + animales x 15 (consistente con ranking)
+      const explorerPoints = (stats.flora * 10) + (stats.fauna * 15);
       stats.explorerPoints = explorerPoints;
       
       console.log('📊 [HomeScreen] Estadísticas calculadas:', stats);
@@ -247,14 +248,14 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.explorerPointsTitle}>Puntos de Explorador</Text>
               <Text style={styles.explorerPointsNumber}>{treeStats.explorerPoints}</Text>
               <Text style={styles.explorerPointsSubtitle}>
-                {treeStats.flora} árboles × 100 + {treeStats.fauna} animales × 200
+                {treeStats.flora} árboles × 10 + {treeStats.fauna} animales × 15
               </Text>
             </View>
             <View style={styles.explorerBadge}>
               <Text style={styles.explorerBadgeText}>
-                {treeStats.explorerPoints >= 1000 ? '🏆 Experto' : 
-                 treeStats.explorerPoints >= 500 ? '🥇 Avanzado' : 
-                 treeStats.explorerPoints >= 200 ? '🥈 Intermedio' : '🥉 Novato'}
+                {treeStats.explorerPoints >= 100 ? '🏆 Experto' : 
+                 treeStats.explorerPoints >= 50 ? '🥇 Avanzado' : 
+                 treeStats.explorerPoints >= 20 ? '🥈 Intermedio' : '🥉 Novato'}
               </Text>
             </View>
           </View>
@@ -323,24 +324,27 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.communityStatLabel}>Mis Animales Aprobados</Text>
             </TouchableOpacity>
           </View>
-          
-          {/* Indicador animado hacia abajo */}
-          <View style={styles.scrollIndicatorContainer}>
-            <Text style={styles.scrollIndicatorText}>Explora por categoría</Text>
-            <Animated.View style={[
-              styles.scrollIndicator,
-              {
-                transform: [{
-                  translateY: scrollIndicatorAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 8]
-                  })
-                }]
-              }
-            ]}>
-              <Ionicons name="chevron-down" size={24} color="#2d5016" />
-            </Animated.View>
-          </View>
+        </View>
+
+        {/* Ranking de Exploradores */}
+        <RankingCard />
+
+        {/* Indicador animado hacia abajo */}
+        <View style={styles.scrollIndicatorContainer}>
+          <Text style={styles.scrollIndicatorText}>Explora por categoría</Text>
+          <Animated.View style={[
+            styles.scrollIndicator,
+            {
+              transform: [{
+                translateY: scrollIndicatorAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 8]
+                })
+              }]
+            }
+          ]}>
+            <Ionicons name="chevron-down" size={24} color="#2d5016" />
+          </Animated.View>
         </View>
 
         {/* Botón especial para científicos y admins */}
@@ -673,8 +677,9 @@ const styles = StyleSheet.create({
   },
   scrollIndicatorContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 15,
     paddingHorizontal: 15,
+    marginTop: 5,
   },
   scrollIndicatorText: {
     fontSize: 16,

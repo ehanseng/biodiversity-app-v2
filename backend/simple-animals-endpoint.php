@@ -34,7 +34,12 @@ try {
             // Obtener todos los animales
             error_log("[simple-animals-endpoint] Obteniendo todos los animales");
             
-            $stmt = $pdo->query("SELECT * FROM animals ORDER BY created_at DESC");
+            $stmt = $pdo->query("
+                SELECT a.*, u.full_name as user_name 
+                FROM animals a 
+                LEFT JOIN users u ON a.user_id = u.id 
+                ORDER BY a.created_at DESC
+            ");
             $animals = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             error_log("[simple-animals-endpoint] Animales encontrados: " . count($animals));
@@ -127,10 +132,91 @@ try {
             break;
             
         case 'PUT':
-            // Actualizar animal (para futuras funcionalidades)
-            error_log("[simple-animals-endpoint] Actualización de animales no implementada aún");
-            http_response_code(501);
-            echo json_encode(['error' => 'Actualización no implementada']);
+            // Actualizar animal (especialmente para cambios de estado)
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            if (!$input || !isset($input['id'])) {
+                error_log("[simple-animals-endpoint] Error: ID requerido para actualización");
+                http_response_code(400);
+                echo json_encode(['error' => 'ID es requerido']);
+                exit();
+            }
+            
+            $animalId = $input['id'];
+            error_log("[simple-animals-endpoint] Actualizando animal: $animalId");
+            
+            // Construir query dinámicamente
+            $updateFields = [];
+            $updateValues = [];
+            
+            if (isset($input['status'])) {
+                $updateFields[] = "status = ?";
+                $updateValues[] = $input['status'];
+            }
+            if (isset($input['approval_status'])) {
+                $updateFields[] = "approval_status = ?";
+                $updateValues[] = $input['approval_status'];
+            }
+            if (isset($input['common_name'])) {
+                $updateFields[] = "common_name = ?";
+                $updateValues[] = $input['common_name'];
+            }
+            if (isset($input['scientific_name'])) {
+                $updateFields[] = "scientific_name = ?";
+                $updateValues[] = $input['scientific_name'];
+            }
+            
+            if (empty($updateFields)) {
+                error_log("[simple-animals-endpoint] Error: No hay campos para actualizar");
+                http_response_code(400);
+                echo json_encode(['error' => 'No hay campos para actualizar']);
+                exit();
+            }
+            
+            $updateFields[] = "updated_at = NOW()";
+            $updateValues[] = $animalId;
+            
+            $sql = "UPDATE animals SET " . implode(', ', $updateFields) . " WHERE id = ?";
+            $stmt = $pdo->prepare($sql);
+            $result = $stmt->execute($updateValues);
+            
+            if ($result) {
+                // Si se cambió el estado a 'approved', actualizar puntos del usuario
+                if (isset($input['status']) && $input['status'] === 'approved') {
+                    // Obtener user_id del animal
+                    $userStmt = $pdo->prepare("SELECT user_id FROM animals WHERE id = ?");
+                    $userStmt->execute([$animalId]);
+                    $animal = $userStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($animal) {
+                        // Actualizar puntos del usuario
+                        $pointsStmt = $pdo->prepare("
+                            UPDATE users SET explorer_points = (
+                                (SELECT COUNT(*) FROM trees WHERE user_id = ? AND status = 'approved') * 10 +
+                                (SELECT COUNT(*) FROM animals WHERE user_id = ? AND status = 'approved') * 15
+                            ) WHERE id = ?
+                        ");
+                        $pointsStmt->execute([$animal['user_id'], $animal['user_id'], $animal['user_id']]);
+                        error_log("[simple-animals-endpoint] Puntos actualizados para usuario: " . $animal['user_id']);
+                    }
+                }
+                
+                // Obtener el animal actualizado
+                $stmt = $pdo->prepare("SELECT * FROM animals WHERE id = ?");
+                $stmt->execute([$animalId]);
+                $updatedAnimal = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                error_log("[simple-animals-endpoint] Animal actualizado exitosamente: $animalId");
+                echo json_encode([
+                    'success' => true,
+                    'data' => $updatedAnimal,
+                    'message' => 'Animal actualizado exitosamente'
+                ]);
+            } else {
+                error_log("[simple-animals-endpoint] Error al actualizar animal");
+                http_response_code(500);
+                echo json_encode(['error' => 'Error al actualizar animal']);
+            }
             break;
             
         case 'DELETE':
