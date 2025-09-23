@@ -67,7 +67,11 @@ try {
         if (!$user) {
             error_log("Simple Login Endpoint - Usuario no encontrado: " . $input['email']);
             http_response_code(401);
-            echo json_encode(['error' => 'Credenciales inválidas']);
+            echo json_encode([
+                'error' => 'Credenciales incorrectas',
+                'message' => 'El email o la contraseña que ingresaste son incorrectos. Por favor verifica tus datos e intenta nuevamente.',
+                'details' => 'Usuario no encontrado'
+            ]);
             exit();
         }
         
@@ -75,7 +79,11 @@ try {
         if (!password_verify($input['password'], $user['password_hash'])) {
             error_log("Simple Login Endpoint - Contraseña incorrecta para: " . $input['email']);
             http_response_code(401);
-            echo json_encode(['error' => 'Credenciales inválidas']);
+            echo json_encode([
+                'error' => 'Credenciales incorrectas',
+                'message' => 'El email o la contraseña que ingresaste son incorrectos. Por favor verifica tus datos e intenta nuevamente.',
+                'details' => 'Contraseña incorrecta'
+            ]);
             exit();
         }
         

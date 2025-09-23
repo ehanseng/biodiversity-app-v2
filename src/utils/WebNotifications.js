@@ -2,56 +2,30 @@
 class WebNotifications {
   constructor() {
     this.permission = 'default';
-    this.init();
+    // No inicializar automáticamente para evitar warnings del navegador
   }
 
-  async init() {
-    if ('Notification' in window) {
-      this.permission = await Notification.requestPermission();
-    }
-  }
-
-  // Mostrar notificación nativa del navegador
+  // Mostrar notificación - SIEMPRE usar fallback toast para mejor compatibilidad web
   showNotification(title, options = {}) {
-    if (!('Notification' in window)) {
-      console.warn('Este navegador no soporta notificaciones');
-      return this.showFallbackToast(title, options.body);
+    console.log('🔔 [WebNotifications] Mostrando toast:', title, options.body);
+    
+    // Determinar tipo basado en el tag o opciones
+    let type = 'info';
+    if (options.tag === 'error' || title.toLowerCase().includes('error')) {
+      type = 'error';
+    } else if (options.tag === 'warning' || title.toLowerCase().includes('advertencia') || title.toLowerCase().includes('requeridos')) {
+      type = 'warning';
+    } else if (options.tag === 'success' || title.toLowerCase().includes('éxito')) {
+      type = 'success';
     }
-
-    if (this.permission === 'granted') {
-      const notification = new Notification(title, {
-        body: options.body || '',
-        icon: options.icon || '/favicon.ico',
-        badge: options.badge || '/favicon.ico',
-        tag: options.tag || 'biodiversity-app',
-        requireInteraction: options.requireInteraction || false,
-        silent: options.silent || false,
-        ...options
-      });
-
-      // Auto-cerrar después de 4 segundos
-      setTimeout(() => {
-        notification.close();
-      }, options.duration || 4000);
-
-      return notification;
-    } else if (this.permission === 'denied') {
-      console.warn('Notificaciones denegadas por el usuario');
-      return this.showFallbackToast(title, options.body);
-    } else {
-      // Pedir permiso
-      this.requestPermission().then(() => {
-        if (this.permission === 'granted') {
-          this.showNotification(title, options);
-        } else {
-          this.showFallbackToast(title, options.body);
-        }
-      });
-    }
+    
+    return this.showFallbackToast(title, options.body, type);
   }
 
   // Fallback: mostrar toast visual en la página
   showFallbackToast(title, body, type = 'success') {
+    console.log('🍞 [WebNotifications] showFallbackToast llamado:', { title, body, type });
+    
     const toast = document.createElement('div');
     
     // Obtener color según el tipo

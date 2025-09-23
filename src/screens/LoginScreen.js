@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/SimpleAuthContext';
 import usePageTitle from '../hooks/usePageTitle';
+import SimpleToast from '../utils/SimpleToast';
 
 const LoginScreen = ({ navigation }) => {
   usePageTitle('Iniciar Sesión'); // Actualizar título de la página
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const { signIn } = useAuth();
 
 
@@ -16,11 +18,15 @@ const LoginScreen = ({ navigation }) => {
     console.log('🔐 Intentando login con:', { email, passwordLength: password.length });
     
     if (!email || !password) {
-      Alert.alert('Error', 'Por favor completa todos los campos');
+      const message = 'Por favor completa todos los campos antes de continuar';
+      setErrorMessage(message);
+      
+      SimpleToast.warning('Campos requeridos', message);
       return;
     }
 
     setLoading(true);
+    setErrorMessage(''); // Limpiar errores previos
     
     try {
       const result = await signIn(email, password);
@@ -29,26 +35,24 @@ const LoginScreen = ({ navigation }) => {
       if (result.error) {
         console.error('❌ Error en login:', result.error);
         
-        // Mostrar error más específico
-        let errorMessage = 'Error de autenticación';
-        if (result.error.includes('Invalid login credentials')) {
-          errorMessage = 'Email o contraseña incorrectos. Verifica tus datos.';
-        } else if (result.error.includes('Email not confirmed')) {
-          errorMessage = 'Debes confirmar tu email antes de iniciar sesión. Revisa tu bandeja de entrada.';
-        } else if (result.error.includes('Too many requests')) {
-          errorMessage = 'Demasiados intentos. Espera unos minutos antes de intentar de nuevo.';
-        } else {
-          errorMessage = result.error;
-        }
-        
-        Alert.alert('Error de autenticación', errorMessage);
+        // Mostrar error tanto en pantalla como en notificación
+        setErrorMessage(result.error);
+        SimpleToast.error('Error de autenticación', result.error);
       } else {
         console.log('✅ Login exitoso');
         // El AuthContext se encarga de la navegación automática
       }
     } catch (error) {
       console.error('❌ Error inesperado en login:', error);
-      Alert.alert('Error', 'Ocurrió un error inesperado. Intenta de nuevo.');
+      
+      // Si el error viene del servidor, mostrar el mensaje específico
+      let errorMsg = 'Ocurrió un error inesperado. Intenta de nuevo.';
+      if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      setErrorMessage(errorMsg);
+      SimpleToast.error('Error de conexión', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -68,7 +72,10 @@ const LoginScreen = ({ navigation }) => {
             style={styles.input}
             placeholder="Correo electrónico"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (errorMessage) setErrorMessage(''); // Limpiar error al escribir
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -78,10 +85,21 @@ const LoginScreen = ({ navigation }) => {
             style={styles.input}
             placeholder="Contraseña"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (errorMessage) setErrorMessage(''); // Limpiar error al escribir
+            }}
             secureTextEntry
             autoCapitalize="none"
           />
+
+          {/* Mensaje de error en pantalla */}
+          {errorMessage ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={20} color="#dc3545" />
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
@@ -166,6 +184,24 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#2d5016',
     fontSize: 14,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8d7da',
+    borderColor: '#f5c6cb',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 15,
+  },
+  errorText: {
+    color: '#721c24',
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 18,
   },
 });
 

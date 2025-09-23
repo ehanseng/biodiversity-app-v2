@@ -69,57 +69,77 @@ try {
         ]);
         
     } elseif ($method === 'PUT') {
+        // Logging detallado para debugging
+        error_log("🔧 [DEBUG] PUT request iniciado");
+        error_log("🔧 [DEBUG] GET params: " . json_encode($_GET));
+        error_log("🔧 [DEBUG] Input data: " . json_encode($input));
+        
         // Obtener ID del usuario
         $userId = $_GET['id'] ?? null;
+        error_log("🔧 [DEBUG] User ID extraído: " . $userId);
         
         if (!$userId) {
+            error_log("❌ [DEBUG] Error: ID de usuario no proporcionado");
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'ID de usuario requerido']);
             exit();
         }
         
         // Verificar si el usuario existe
+        error_log("🔧 [DEBUG] Verificando si usuario existe...");
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$existingUser) {
+            error_log("❌ [DEBUG] Error: Usuario no encontrado en BD");
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
             exit();
         }
         
+        error_log("✅ [DEBUG] Usuario encontrado: " . $existingUser['email']);
+        
         // Construir query de actualización
+        error_log("🔧 [DEBUG] Construyendo query de actualización...");
         $updateFields = [];
         $values = [];
         
         // Campos permitidos para actualizar
         if (isset($input['is_active'])) {
+            error_log("🔧 [DEBUG] Actualizando is_active: " . ($input['is_active'] ? 'true' : 'false'));
             $updateFields[] = "is_active = ?";
             $values[] = $input['is_active'] ? 1 : 0;
         }
         
         if (isset($input['email'])) {
+            error_log("🔧 [DEBUG] Actualizando email: " . $input['email']);
             $updateFields[] = "email = ?";
             $values[] = $input['email'];
         }
         
         if (isset($input['full_name'])) {
+            error_log("🔧 [DEBUG] Actualizando full_name: " . $input['full_name']);
             $updateFields[] = "full_name = ?";
             $values[] = $input['full_name'];
         }
         
         if (isset($input['role'])) {
+            error_log("🔧 [DEBUG] Actualizando role: " . $input['role']);
             $updateFields[] = "role = ?";
             $values[] = $input['role'];
         }
         
         if (isset($input['password'])) {
-            $updateFields[] = "password = ?";
-            $values[] = password_hash($input['password'], PASSWORD_DEFAULT);
+            error_log("🔧 [DEBUG] Actualizando password_hash (hash será generado)");
+            $hashedPassword = password_hash($input['password'], PASSWORD_DEFAULT);
+            error_log("🔧 [DEBUG] Hash generado: " . substr($hashedPassword, 0, 20) . "...");
+            $updateFields[] = "password_hash = ?";
+            $values[] = $hashedPassword;
         }
         
         if (empty($updateFields)) {
+            error_log("❌ [DEBUG] Error: No hay campos para actualizar");
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'No hay campos válidos para actualizar']);
             exit();
@@ -127,26 +147,36 @@ try {
         
         // Agregar updated_at
         $updateFields[] = "updated_at = NOW()";
-        
         $values[] = $userId;
-        $sql = "UPDATE users SET " . implode(', ', $updateFields) . " WHERE id = ?";
         
+        $sql = "UPDATE users SET " . implode(', ', $updateFields) . " WHERE id = ?";
+        error_log("🔧 [DEBUG] SQL Query: " . $sql);
+        error_log("🔧 [DEBUG] Valores: " . json_encode($values));
+        
+        error_log("🔧 [DEBUG] Ejecutando query...");
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($values);
+        $result = $stmt->execute($values);
+        error_log("🔧 [DEBUG] Query ejecutada. Resultado: " . ($result ? 'true' : 'false'));
+        error_log("🔧 [DEBUG] Filas afectadas: " . $stmt->rowCount());
         
         // Obtener usuario actualizado
+        error_log("🔧 [DEBUG] Obteniendo usuario actualizado...");
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $updatedUser = $stmt->fetch(PDO::FETCH_ASSOC);
         
         // Procesar campos
         if ($updatedUser) {
+            error_log("✅ [DEBUG] Usuario actualizado obtenido correctamente");
             $updatedUser['id'] = (int)$updatedUser['id'];
             $updatedUser['is_active'] = (bool)$updatedUser['is_active'];
-            // No incluir password en la respuesta
-            unset($updatedUser['password']);
+            // No incluir password_hash en la respuesta
+            unset($updatedUser['password_hash']);
+        } else {
+            error_log("❌ [DEBUG] Error: No se pudo obtener el usuario actualizado");
         }
         
+        error_log("🎉 [DEBUG] Enviando respuesta exitosa");
         echo json_encode([
             'success' => true,
             'message' => 'Usuario actualizado exitosamente',
@@ -194,10 +224,20 @@ try {
     }
     
 } catch (Exception $e) {
+    error_log("💥 [DEBUG] Exception capturada: " . $e->getMessage());
+    error_log("💥 [DEBUG] Archivo: " . $e->getFile());
+    error_log("💥 [DEBUG] Línea: " . $e->getLine());
+    error_log("💥 [DEBUG] Trace: " . $e->getTraceAsString());
+    
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Error interno del servidor: ' . $e->getMessage()
+        'message' => 'Error interno del servidor: ' . $e->getMessage(),
+        'debug' => [
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString()
+        ]
     ]);
 }
 ?>

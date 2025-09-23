@@ -230,7 +230,7 @@ class UserManagementService {
         return updatedUser;
       }
       
-      // Usar endpoint corregido con ID en query params
+      // Usar endpoint corregido con password_hash
       const url = `${this.baseUrl.replace('/api', '')}/admin-users-fixed.php?id=${userId}`;
       const response = await fetch(url, {
         method: 'PUT',

@@ -69,10 +69,24 @@ class SimpleUserService {
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Credenciales inválidas');
+        let errorMessage = `Error HTTP: ${response.status}`;
+        
+        // Intentar obtener el mensaje de error del servidor
+        try {
+          const errorData = await response.json();
+          if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // Si no puede leer JSON, usar mensaje por defecto
+          if (response.status === 401) {
+            errorMessage = 'El email o la contraseña son incorrectos. Por favor verifica tus datos e intenta nuevamente.';
+          }
         }
-        throw new Error(`Error HTTP: ${response.status}`);
+        
+        throw new Error(errorMessage);
       }
 
       const responseText = await response.text();
